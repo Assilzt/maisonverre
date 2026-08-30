@@ -144,7 +144,7 @@ export default function Home() {
     if (PHONE_PATTERN.test(trimmedPhone) && !abandonedOrderSentRef.current) {
       abandonedOrderSentRef.current = true;
 
-      const abandonedMessage = `⚠️ Abandoned Order\n📞 Phone: ${trimmedPhone}${fullName ? `\n👤 Name: ${fullName}` : ''}${wilaya ? `\n📍 Wilaya: ${wilaya}` : ''}${commune ? `\n🏘️ Commune: ${commune}` : ''}`;
+      const abandonedMessage = `⚠️ Abandoned Order\n📞 Phone: ${trimmedPhone}${fullName ? `\n👤 Name: ${fullName}` : ''}${wilaya ? `\n📍 Wilaya: ${wilaya}` : ''}`;
 
       fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',
@@ -179,7 +179,7 @@ export default function Home() {
 
     setIsSubmitting(true);
 
-    const message = `طلب جديد 🌸\nالاسم: ${fullName || '—'}\nالولاية: ${wilaya || '—'}\nالبلدية: ${commune || '—'}\nرقم الهاتف: ${phone}`;
+    const message = `طلب جديد 🌸\nالاسم: ${fullName || '—'}\nالولاية: ${wilaya || '—'}\nرقم الهاتف: ${phone}`;
 
     try {
       const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -197,7 +197,6 @@ export default function Home() {
         setSubmitted(true);
         setFullName('');
         setWilaya('');
-        setCommune('');
         setPhone('');
         abandonedOrderSentRef.current = false;
         facebookLeadSentRef.current = false;
@@ -300,27 +299,9 @@ export default function Home() {
                   </Select>
                 </div>
 
-                {wilaya && (
-                  <div className="space-y-2">
-                    <Label htmlFor="commune">البلدية</Label>
-                    <Select value={commune} onValueChange={(value) => setCommune(value)} disabled={!availableCommunes.length}>
-                      <SelectTrigger id="commune" className="text-right" dir="rtl">
-                        <SelectValue placeholder="اختر البلدية" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCommunes.map((item) => (
-                          <SelectItem key={item} value={item} className="text-right">
-                            {item}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
                 <div className="text-center py-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
                   <p className="text-base font-semibold text-gray-800" dir="rtl">
-                    سعر الباك: 1900 دج + توصيل 500 دج
+                    سعر الباك: 2700 دج
                   </p>
                 </div>
 
