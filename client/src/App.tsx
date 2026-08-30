@@ -1,5 +1,3 @@
-import Home from "@/pages/Home";
+import OriginalApp from "@/react-app/App";
 
-export default function App() {
-  return <Home />;
-}
+export default OriginalApp;
