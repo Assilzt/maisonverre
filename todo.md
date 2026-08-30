@@ -1,6 +1,8 @@
-# Atlasio update checklist
+# Facebook Pixel implementation checklist
 
-- [ ] Change the displayed pack price to 2700 دج.
-- [ ] Remove the delivery-price text and delivery-price amount.
-- [ ] Remove the commune/municipality field and its submitted value.
-- [ ] Verify the page and save a new checkpoint.
+- [ ] Add the base Pixel script for ID 837444182648161 and PageView.
+- [ ] Add ViewContent and InitiateCheckout with product metadata.
+- [ ] Track Lead once when a valid phone number is entered.
+- [ ] Track Purchase once only after a successful order submission.
+- [ ] Verify no duplicate events and test the live preview.
+- [ ] Save a checkpoint and deliver testing instructions.

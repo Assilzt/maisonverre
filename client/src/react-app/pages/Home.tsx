@@ -96,11 +96,19 @@ const validatePhone = (value: string): string => {
   return '';
 };
 
-const fireFacebookLead = () => {
+const PRODUCT_EVENT_DATA: Record<string, unknown> = {
+  content_name: 'باك الربيع الملكي',
+  content_ids: ['atlasio-spring-pack'],
+  content_type: 'product',
+  value: 2700,
+  currency: 'DZD',
+};
+
+const fireFacebookEvent = (eventName: string, parameters: Record<string, unknown> = {}) => {
   const fbq = (window as Window & { fbq?: (...args: unknown[]) => void }).fbq;
 
   if (typeof fbq === 'function') {
-    fbq('track', 'Lead');
+    fbq('track', eventName, parameters);
   }
 };
 
@@ -113,9 +121,23 @@ export default function Home() {
   const [submitted, setSubmitted] = useState(false);
   const abandonedOrderSentRef = useRef(false);
   const facebookLeadSentRef = useRef(false);
+  const initiateCheckoutSentRef = useRef(false);
 
   const availableCommunes = wilaya ? WILAYA_COMMUNES[wilaya] ?? [] : [];
   const phoneError = phone ? validatePhone(phone) : '';
+
+  useEffect(() => {
+    fireFacebookEvent('ViewContent', PRODUCT_EVENT_DATA);
+  }, []);
+
+  const trackInitiateCheckout = () => {
+    if (initiateCheckoutSentRef.current) {
+      return;
+    }
+
+    initiateCheckoutSentRef.current = true;
+    fireFacebookEvent('InitiateCheckout', PRODUCT_EVENT_DATA);
+  };
 
   useEffect(() => {
     if (!wilaya) {
@@ -160,7 +182,10 @@ export default function Home() {
 
     if (PHONE_PATTERN.test(trimmedPhone) && !facebookLeadSentRef.current && !submitted) {
       facebookLeadSentRef.current = true;
-      fireFacebookLead();
+      fireFacebookEvent('Lead', {
+        ...PRODUCT_EVENT_DATA,
+        lead_source: 'valid_phone',
+      });
     }
 
     if (!PHONE_PATTERN.test(trimmedPhone)) {
@@ -177,6 +202,7 @@ export default function Home() {
       return;
     }
 
+    trackInitiateCheckout();
     setIsSubmitting(true);
 
     const message = `طلب جديد 🌸\nالاسم: ${fullName || '—'}\nالولاية: ${wilaya || '—'}\nرقم الهاتف: ${phone}`;
@@ -194,6 +220,7 @@ export default function Home() {
       });
 
       if (response.ok) {
+        fireFacebookEvent('Purchase', PRODUCT_EVENT_DATA);
         setSubmitted(true);
         setFullName('');
         setWilaya('');
@@ -251,7 +278,7 @@ export default function Home() {
                 </Button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} onFocus={trackInitiateCheckout} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone">رقم الهاتف</Label>
                   <Input
