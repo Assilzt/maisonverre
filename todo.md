@@ -1,8 +1,6 @@
-# Facebook Pixel implementation checklist
+# Landing page conversion update
 
-- [ ] Add the base Pixel script for ID 837444182648161 and PageView.
-- [ ] Add ViewContent and InitiateCheckout with product metadata.
-- [ ] Track Lead once when a valid phone number is entered.
-- [ ] Track Purchase once only after a successful order submission.
-- [ ] Verify no duplicate events and test the live preview.
-- [ ] Save a checkpoint and deliver testing instructions.
+- [ ] Add a concise, honest seasonal suitability note for the four flower types.
+- [ ] Review the page for practical conversion improvements that do not invent reviews or claims.
+- [ ] Verify the form, Pixel events, visual layout, and production build.
+- [ ] Save a checkpoint and deliver the updated link with recommendations.

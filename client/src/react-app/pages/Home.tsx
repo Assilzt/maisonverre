@@ -332,6 +332,10 @@ export default function Home() {
                   </p>
                 </div>
 
+                <p className="text-center text-xs leading-6 text-gray-600" dir="rtl">
+                  الزينيا والكوسموس والقتيفة محبة للدفء؛ قد تزهر من الصيف إلى الخريف المبكر حسب المنطقة والعناية. المارغريت تفضّل الجو المعتدل وقد يقل إزهارها مع الحر الشديد.
+                </p>
+
                 <Button 
                   type="submit" 
                   className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold text-lg py-6"
