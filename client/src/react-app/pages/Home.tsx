@@ -97,10 +97,30 @@ const validatePhone = (value: string): string => {
 
 const DEFAULT_PRICE = 1900;
 const SPECIAL_PRICE = 2700;
+const LIMITED_OFFER_DURATION_MS = 10 * 60 * 1000;
+const isLimitedOffer = new URLSearchParams(window.location.search).get('offer') === 'limited';
+const LIMITED_OFFER_STORAGE_KEY = 'atlasio-limited-offer-ends-at';
 
 const getOfferPrice = () => {
   const requestedPrice = new URLSearchParams(window.location.search).get('price');
+  if (isLimitedOffer) return DEFAULT_PRICE;
   return requestedPrice === String(SPECIAL_PRICE) ? SPECIAL_PRICE : DEFAULT_PRICE;
+};
+
+const getLimitedOfferEndsAt = () => {
+  if (!isLimitedOffer) return null;
+  const storedEndsAt = Number(window.localStorage.getItem(LIMITED_OFFER_STORAGE_KEY));
+  if (storedEndsAt > 0) return storedEndsAt;
+  const endsAt = Date.now() + LIMITED_OFFER_DURATION_MS;
+  window.localStorage.setItem(LIMITED_OFFER_STORAGE_KEY, String(endsAt));
+  return endsAt;
+};
+
+const formatCountdown = (milliseconds: number) => {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
 };
 
 const getProductEventData = (price: number): Record<string, unknown> => ({
@@ -201,12 +221,21 @@ export default function Home() {
   const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [offerPrice] = useState(getOfferPrice);
+  const [limitedOfferEndsAt] = useState(getLimitedOfferEndsAt);
+  const [currentTime, setCurrentTime] = useState(Date.now());
   const facebookLeadSentRef = useRef(false);
+  const limitedOfferActive = Boolean(limitedOfferEndsAt && currentTime < limitedOfferEndsAt);
+  const offerPrice = isLimitedOffer && !limitedOfferActive ? SPECIAL_PRICE : getOfferPrice();
   const productEventData = getProductEventData(offerPrice);
   const initiateCheckoutSentRef = useRef(false);
 
   const phoneError = phone ? validatePhone(phone) : '';
+
+  useEffect(() => {
+    if (!limitedOfferEndsAt) return;
+    const intervalId = window.setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
+  }, [limitedOfferEndsAt]);
 
   useEffect(() => {
     fireFacebookEventOnce('ViewContent', `view-content:${offerPrice}`, productEventData);
@@ -334,6 +363,19 @@ export default function Home() {
             <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
               اترك رقم هاتفك فقط، وسنتصل بك لتأكيد الطلب والولاية وتفاصيل التوصيل.
             </p>
+
+            {isLimitedOffer && (
+              <div className={`mb-5 rounded-xl border p-3 text-center ${limitedOfferActive ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`} dir="rtl">
+                {limitedOfferActive ? (
+                  <>
+                    <p className="text-sm font-bold text-amber-800">عرض خاص لزوار الصفحة: 1900 دج بدل 2700 دج</p>
+                    <p className="mt-1 text-xs text-amber-700">ينتهي السعر المخفض خلال <span className="font-bold tabular-nums">{formatCountdown(limitedOfferEndsAt! - currentTime)}</span></p>
+                  </>
+                ) : (
+                  <p className="text-sm font-semibold text-gray-700">انتهى العرض الخاص — السعر الحالي: 2700 دج</p>
+                )}
+              </div>
+            )}
 
             <div className="md:hidden mb-6 w-full">
               <ImageSlider compact />
