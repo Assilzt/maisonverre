@@ -280,37 +280,32 @@ export default function Home() {
       return;
     }
 
-    const abandonedStorageKey = `atlasio:abandoned-order:${trimmedPhone}`;
-    const handlePageExit = () => {
-      try {
-        if (window.sessionStorage.getItem(abandonedStorageKey)) {
-          return;
-        }
+    const leadStorageKey = `atlasio:telegram-lead:${trimmedPhone}`;
 
-        // Mark before sending so refreshes or repeated page-exit events cannot duplicate it.
-        window.sessionStorage.setItem(abandonedStorageKey, '1');
-      } catch {
-        // Continue without deduplication if browser storage is unavailable.
+    try {
+      if (window.sessionStorage.getItem(leadStorageKey)) {
+        return;
       }
 
-      const abandonedMessage = `⚠️ Abandoned Order\n📞 Phone: ${trimmedPhone}${fullName ? `\n👤 Name: ${fullName}` : ''}${wilaya ? `\n📍 Wilaya: ${wilaya}` : ''}${commune ? `\n🏘️ Commune: ${commune}` : ''}`;
+      // Mark before sending so React re-renders or repeated input events cannot duplicate the lead.
+      window.sessionStorage.setItem(leadStorageKey, '1');
+    } catch {
+      // Continue without deduplication if browser storage is unavailable.
+    }
 
-      void fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: abandonedMessage,
-        }),
-        keepalive: true,
-      }).catch(() => undefined);
-    };
+    const leadMessage = `📥 رقم مهتم جديد\n📞 الهاتف: ${trimmedPhone}`;
 
-    window.addEventListener('pagehide', handlePageExit);
-    return () => window.removeEventListener('pagehide', handlePageExit);
-  }, [phone, fullName, wilaya, commune, submitted]);
+    void fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: leadMessage,
+      }),
+    }).catch(() => undefined);
+  }, [phone, submitted]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
