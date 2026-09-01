@@ -3,7 +3,7 @@ import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/react-app/components/ui/select';
 import { Label } from '@/react-app/components/ui/label';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const WILAYAS = [
   'الجزائر', 'وهران', 'قسنطينة', 'عنابة', 'البليدة', 'باتنة', 'سطيف', 'سيدي بلعباس', 'بسكرة', 'تلمسان',
@@ -78,16 +78,6 @@ const WILAYA_COMMUNES: Record<string, string[]> = {
 
 const PHONE_PATTERN = /^(0\d{9}|\+213\d{9})$/;
 
-const PRODUCT_IMAGE = '/manus-storage/MAIN_7c24329e.jpeg';
-const PROOF_IMAGE = '/manus-storage/atlasio-proof_a5825fcc.jpeg';
-const PROOF_IMAGE_2 = '/manus-storage/atlasio-proof2_bad12e06.jpeg';
-
-const IMAGE_SLIDES = [
-  { src: PRODUCT_IMAGE, alt: 'باك الربيع الملكي', label: 'الصورة الرئيسية' },
-  { src: PROOF_IMAGE, alt: 'زهرة برتقالية مزروعة في أصيص', label: 'نتيجة زراعة 1' },
-  { src: PROOF_IMAGE_2, alt: 'شتلات صغيرة نامية في أصيص', label: 'نتيجة زراعة 2' },
-] as const;
-
 const TELEGRAM_BOT_TOKEN = '8028024261:AAGqUaxed7tsD7PoMb1gQ9QPeVp6tGC8JlQ';
 const TELEGRAM_CHAT_ID = '-1003776870179';
 
@@ -140,92 +130,6 @@ const fireFacebookEventOnce = (
 
   fireFacebookEvent(eventName, parameters);
 };
-
-function ImageCarousel({ className = '' }: { className?: string }) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const activeSlide = IMAGE_SLIDES[activeIndex];
-
-  useEffect(() => {
-    if (isPaused) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setActiveIndex((currentIndex) => (currentIndex + 1) % IMAGE_SLIDES.length);
-    }, 2500);
-
-    return () => window.clearInterval(intervalId);
-  }, [isPaused]);
-
-  const goToPrevious = () => {
-    setActiveIndex((currentIndex) => (currentIndex - 1 + IMAGE_SLIDES.length) % IMAGE_SLIDES.length);
-  };
-
-  const goToNext = () => {
-    setActiveIndex((currentIndex) => (currentIndex + 1) % IMAGE_SLIDES.length);
-  };
-
-  return (
-    <div
-      className={`group relative overflow-hidden rounded-2xl bg-white shadow-2xl ${className}`}
-      role="region"
-      aria-label="معرض صور المنتج ونتائج الزراعة"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-      onFocus={() => setIsPaused(true)}
-      onBlur={() => setIsPaused(false)}
-    >
-      <img
-        key={activeSlide.src}
-        src={activeSlide.src}
-        alt={activeSlide.alt}
-        className="aspect-square w-full object-contain bg-white"
-        loading="eager"
-      />
-
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-3">
-        <span className="rounded-full bg-black/55 px-3 py-1 text-xs font-semibold text-white" dir="rtl">
-          {activeSlide.label}
-        </span>
-        <span className="rounded-full bg-black/55 px-3 py-1 text-xs text-white" dir="ltr" aria-live="polite">
-          {activeIndex + 1} / {IMAGE_SLIDES.length}
-        </span>
-      </div>
-
-      <button
-        type="button"
-        onClick={goToPrevious}
-        className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
-        aria-label="الصورة السابقة"
-      >
-        <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        onClick={goToNext}
-        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
-        aria-label="الصورة التالية"
-      >
-        <ChevronRight className="h-5 w-5" aria-hidden="true" />
-      </button>
-
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/55 to-transparent px-4 pb-3 pt-8" role="tablist" aria-label="اختيار الصورة">
-        {IMAGE_SLIDES.map((slide, index) => (
-          <button
-            key={slide.src}
-            type="button"
-            role="tab"
-            aria-selected={activeIndex === index}
-            aria-label={`عرض ${slide.label}`}
-            onClick={() => setActiveIndex(index)}
-            className={`h-2.5 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${activeIndex === index ? 'w-7 bg-white' : 'w-2.5 bg-white/60 hover:bg-white/90'}`}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function Home() {
   const [fullName, setFullName] = useState('');
@@ -352,12 +256,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: 'url(https://019c59e5-a441-7ab2-aa7d-eeda79331ce2.mochausercontent.com/flower-background.png)',
-        }}
-      >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(236,253,245,0.95),_transparent_52%),linear-gradient(135deg,_#fff7ed_0%,_#fdf2f8_48%,_#ecfdf5_100%)]">
         <div className="absolute inset-0 bg-white/70 backdrop-blur-sm"></div>
       </div>
 
@@ -368,8 +267,10 @@ export default function Home() {
               حوّل شرفتك إلى حديقة ملونة خلال أسابيع! 🌸
             </h1>
 
-            <div className="md:hidden mb-6 w-full">
-              <ImageCarousel className="shadow-lg" />
+            <div className="md:hidden mb-6 rounded-xl bg-gradient-to-br from-emerald-50 to-pink-50 p-5 text-center" dir="rtl">
+              <p className="text-4xl" aria-hidden="true">🌸🌿</p>
+              <p className="mt-2 font-semibold text-emerald-800">باك الربيع الملكي</p>
+              <p className="mt-1 text-sm text-gray-600">بذور مختارة لشرفة مليئة بالحياة</p>
             </div>
 
             {submitted ? (
@@ -508,43 +409,27 @@ export default function Home() {
           </div>
 
           <div className="hidden md:flex justify-center items-start sticky top-8">
-            <ImageCarousel className="max-w-lg w-full" />
+            <div className="w-full max-w-lg rounded-3xl bg-gradient-to-br from-emerald-700 via-emerald-600 to-pink-400 p-1 shadow-2xl">
+              <div className="rounded-[1.35rem] bg-white/95 p-10 text-center" dir="rtl">
+                <p className="text-7xl" aria-hidden="true">🌸</p>
+                <h2 className="mt-5 text-3xl font-bold text-emerald-900">ازرع فرحتك</h2>
+                <p className="mt-3 text-lg leading-8 text-gray-600">باك واحد، أربعة أنواع من الزهور، وبداية سهلة لحديقتك.</p>
+                <div className="mt-7 grid grid-cols-2 gap-3 text-sm font-semibold text-emerald-800">
+                  <span className="rounded-xl bg-emerald-50 px-3 py-3">بذور أصلية</span>
+                  <span className="rounded-xl bg-pink-50 px-3 py-3">الدفع عند الاستلام</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <section className="mt-10 rounded-2xl bg-white/90 backdrop-blur-md shadow-xl border border-pink-100 p-6 md:p-8" dir="rtl">
-          <div className="text-center max-w-2xl mx-auto">
-            <p className="text-sm font-semibold text-pink-600 mb-2">من نتائج الزراعة</p>
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-3">شاهدوا النتيجة بأعينكم</h2>
-            <p className="text-sm md:text-base text-gray-600 leading-7">
-              صورة مشاركة من تجربة زراعة حقيقية. النتائج تختلف حسب النوع، الموسم، والعناية.
-            </p>
-          </div>
-
-          <div className="mt-6 grid gap-6 sm:grid-cols-2 max-w-3xl mx-auto">
-            <figure className="overflow-hidden rounded-2xl bg-white shadow-lg border border-pink-100">
-              <img
-                src="/manus-storage/atlasio-proof_a5825fcc.jpeg"
-                alt="زهرة برتقالية مزروعة في أصيص"
-                className="w-full aspect-[3/4] object-cover"
-                loading="lazy"
-              />
-              <figcaption className="px-4 py-3 text-center text-sm text-gray-600">
-                صورة مشاركة من تجربة زراعة
-              </figcaption>
-            </figure>
-
-            <figure className="overflow-hidden rounded-2xl bg-white shadow-lg border border-pink-100">
-              <img
-                src="/manus-storage/atlasio-proof2_bad12e06.jpeg"
-                alt="شتلات صغيرة نامية في أصيص"
-                className="w-full aspect-[3/4] object-cover"
-                loading="lazy"
-              />
-              <figcaption className="px-4 py-3 text-center text-sm text-gray-600">
-                صورة مشاركة من تجربة زراعة
-              </figcaption>
-            </figure>
+        <section className="mt-8 rounded-2xl bg-white/90 p-5 shadow-lg md:p-6" dir="rtl">
+          <div className="flex flex-col gap-3 text-center sm:flex-row sm:items-center sm:justify-between sm:text-right">
+            <div>
+              <p className="text-sm font-semibold text-pink-600">نتائج تختلف حسب العناية</p>
+              <h2 className="mt-1 text-xl font-bold text-gray-800">بداية بسيطة، فرق واضح في شرفتك</h2>
+            </div>
+            <p className="text-sm leading-6 text-gray-600">الزينيا والكوسموس والقتيفة محبة للدفء، والنتائج تختلف حسب النوع والموسم والعناية.</p>
           </div>
         </section>
       </div>
