@@ -413,6 +413,30 @@ export default function Home() {
                   )}
                 </div>
 
+                <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
+                  <p className="text-base font-semibold text-gray-800">
+                    سعر الباك: {offerPrice} دج
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-amber-700">
+                    التوصيل منفصل ويُحسب حسب الولاية وشركة التوصيل.
+                  </p>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold text-lg py-6"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      جاري الإرسال...
+                    </>
+                  ) : (
+                    'أرسل رقمي الآن'
+                  )}
+                </Button>
+
                 <div className="space-y-2">
                   <Label htmlFor="fullName">الاسم</Label>
                   <Input
@@ -455,15 +479,6 @@ export default function Home() {
                   />
                 </div>
 
-                <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
-                  <p className="text-base font-semibold text-gray-800">
-                    سعر الباك: {offerPrice} دج
-                  </p>
-                  <p className="mt-1 text-xs font-medium text-amber-700">
-                    التوصيل منفصل ويُحسب حسب الولاية وشركة التوصيل.
-                  </p>
-                </div>
-
                 <div className="mt-4 overflow-hidden rounded-xl border border-pink-200 bg-gradient-to-br from-white via-pink-50/70 to-emerald-50/80 p-4 shadow-sm" dir="rtl">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
@@ -497,20 +512,6 @@ export default function Home() {
                   الزينيا والكوسموس والقتيفة محبة للدفء؛ قد تزهر من الصيف إلى الخريف المبكر حسب المنطقة والعناية. المارغريت تفضّل الجو المعتدل وقد يقل إزهارها مع الحر الشديد.
                 </p>
 
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold text-lg py-6"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      جاري الإرسال...
-                    </>
-                  ) : (
-                    'أرسل رقمي وسأتلقى مكالمة للتأكيد'
-                  )}
-                </Button>
 
                 <p className="text-center text-sm text-gray-600 mt-4" dir="rtl">
                   الدفع عند الاستلام. سنتصل بك قبل الشحن لتأكيد الطلب والتوصيل.
