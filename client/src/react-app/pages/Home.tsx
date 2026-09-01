@@ -123,6 +123,30 @@ const formatCountdown = (milliseconds: number) => {
   return `${minutes}:${seconds}`;
 };
 
+const getCampaignLabel = (price: number) => {
+  if (isLimitedOffer && price === DEFAULT_PRICE) return 'عرض محدود';
+  if (price === SPECIAL_PRICE) return 'السعر العادي';
+  return 'الرابط الأساسي';
+};
+
+const getLeadStorageKey = (phone: string) => `atlasio:telegram-lead:${phone}`;
+const getLeadMessageStorageKey = (phone: string) => `atlasio:telegram-message:${phone}`;
+
+const getLeadId = (phone: string) => {
+  const storageKey = `atlasio:lead-id:${phone}`;
+
+  try {
+    const existingId = window.sessionStorage.getItem(storageKey);
+    if (existingId) return existingId;
+
+    const leadId = `AT-${Date.now().toString(36).toUpperCase()}`;
+    window.sessionStorage.setItem(storageKey, leadId);
+    return leadId;
+  } catch {
+    return `AT-${Date.now().toString(36).toUpperCase()}`;
+  }
+};
+
 const getProductEventData = (price: number): Record<string, unknown> => ({
   content_name: 'باك الربيع الملكي',
   content_ids: ['atlasio-spring-pack'],
@@ -278,7 +302,7 @@ export default function Home() {
       return;
     }
 
-    const leadStorageKey = `atlasio:telegram-lead:${trimmedPhone}`;
+    const leadStorageKey = getLeadStorageKey(trimmedPhone);
 
     try {
       if (window.sessionStorage.getItem(leadStorageKey)) {
@@ -291,7 +315,8 @@ export default function Home() {
       // Continue without deduplication if browser storage is unavailable.
     }
 
-    const leadMessage = `📥 رقم مهتم جديد\n📞 الهاتف: ${trimmedPhone}`;
+    const leadId = getLeadId(trimmedPhone);
+    const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n📞 الهاتف: ${trimmedPhone}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
 
     void fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -302,7 +327,19 @@ export default function Home() {
         chat_id: TELEGRAM_CHAT_ID,
         text: leadMessage,
       }),
-    }).catch(() => undefined);
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        const messageId = data?.result?.message_id;
+        if (response.ok && messageId) {
+          try {
+            window.sessionStorage.setItem(getLeadMessageStorageKey(trimmedPhone), String(messageId));
+          } catch {
+            // Telegram delivery should never block the lead flow.
+          }
+        }
+      })
+      .catch(() => undefined);
   }, [phone, submitted]);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -316,7 +353,9 @@ export default function Home() {
     trackInitiateCheckout();
     setIsSubmitting(true);
 
-    const message = `طلب جديد 🌸\nالاسم: ${fullName || '—'}\nالولاية: ${wilaya || '—'}\nالبلدية: ${commune.trim() || '—'}\nرقم الهاتف: ${phone}\nالسعر: ${offerPrice} دج`;
+    const trimmedPhone = phone.trim();
+    const leadId = getLeadId(trimmedPhone);
+    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
 
     try {
       const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -331,13 +370,31 @@ export default function Home() {
       });
 
       if (response.ok) {
-        fireFacebookEventOnce('Purchase', `purchase:${offerPrice}:${phone}`, productEventData);
+        const leadMessageId = window.sessionStorage.getItem(getLeadMessageStorageKey(trimmedPhone));
+
+        if (leadMessageId) {
+          void fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              chat_id: TELEGRAM_CHAT_ID,
+              message_id: Number(leadMessageId),
+              text: message,
+            }),
+          }).catch(() => undefined);
+        }
+
+        fireFacebookEventOnce('Purchase', `purchase:${offerPrice}:${trimmedPhone}`, productEventData);
         setSubmitted(true);
         setFullName('');
         setWilaya('');
         setCommune('');
         setPhone('');
         facebookLeadSentRef.current = false;
+        window.sessionStorage.removeItem(getLeadStorageKey(trimmedPhone));
+        window.sessionStorage.removeItem(getLeadMessageStorageKey(trimmedPhone));
       } else {
         alert('حدث خطأ. يرجى المحاولة مرة أخرى.');
       }
