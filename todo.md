@@ -1,6 +1,7 @@
-# Seed quantity copy update
+# Pack contents presentation update
 
-- [ ] Add approximate seed counts based on the provided weights.
-- [ ] Use “حوالي” wording and note that counts vary by seed lot and variety.
-- [ ] Verify the updated copy and production build.
+- [ ] Improve the visual hierarchy of the pack contents section.
+- [ ] Rename the displayed zinnia entry to “زينيا قزم F1”.
+- [ ] Keep the approximate quantities and disclaimer unchanged.
+- [ ] Verify responsive layout and production build.
 - [ ] Save and deliver the updated version link.

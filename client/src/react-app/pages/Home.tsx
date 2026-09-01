@@ -419,15 +419,33 @@ export default function Home() {
                   </p>
                 </div>
 
-                <div className="mt-4 rounded-lg border border-pink-100 bg-pink-50/60 p-3" dir="rtl">
-                  <p className="mb-2 text-center text-sm font-semibold text-gray-800">محتوى الباك — أعداد تقريبية</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs leading-5 text-gray-700">
-                    <span>زينيا إيليغانس القزم F1: حوالي 15 بذرة</span>
-                    <span>مارغريت: حوالي 1900 بذرة</span>
-                    <span>كوزموس: حوالي 200 بذرة</span>
-                    <span>قتيفة (كوليوس): حوالي 680 بذرة</span>
+                <div className="mt-4 overflow-hidden rounded-xl border border-pink-200 bg-gradient-to-br from-white via-pink-50/70 to-emerald-50/80 p-4 shadow-sm" dir="rtl">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold tracking-wide text-pink-600">محتوى الباك</p>
+                      <p className="text-sm font-semibold text-gray-800">4 أنواع زهور متنوعة</p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-gray-600 shadow-sm">أعداد تقريبية</span>
                   </div>
-                  <p className="mt-2 text-center text-[11px] text-gray-500">قد يختلف العدد قليلاً حسب حجم البذور والدفعة.</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
+                      <span className="font-medium text-gray-800">زينيا قزم F1</span>
+                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 15 بذرة</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
+                      <span className="font-medium text-gray-800">مارغريت</span>
+                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 1900 بذرة</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
+                      <span className="font-medium text-gray-800">كوزموس</span>
+                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 200 بذرة</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
+                      <span className="font-medium text-gray-800">قتيفة (كوليوس)</span>
+                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 680 بذرة</span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-center text-[11px] leading-5 text-gray-500">قد يختلف العدد قليلاً حسب حجم البذور والدفعة.</p>
                 </div>
 
                 <p className="text-center text-xs leading-6 text-gray-600" dir="rtl">
