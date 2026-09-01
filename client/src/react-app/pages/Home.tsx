@@ -367,6 +367,42 @@ export default function Home() {
             />
           </div>
         </div>
+
+        <section className="mt-10 rounded-2xl bg-white/90 backdrop-blur-md shadow-xl border border-pink-100 p-6 md:p-8" dir="rtl">
+          <div className="text-center max-w-2xl mx-auto">
+            <p className="text-sm font-semibold text-pink-600 mb-2">من نتائج الزراعة</p>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-3">شاهدوا النتيجة بأعينكم</h2>
+            <p className="text-sm md:text-base text-gray-600 leading-7">
+              صورة مشاركة من تجربة زراعة حقيقية. النتائج تختلف حسب النوع، الموسم، والعناية.
+            </p>
+          </div>
+
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 max-w-3xl mx-auto">
+            <figure className="overflow-hidden rounded-2xl bg-white shadow-lg border border-pink-100">
+              <img
+                src="/manus-storage/atlasio-proof_a5825fcc.jpeg"
+                alt="زهرة برتقالية مزروعة في أصيص"
+                className="w-full aspect-[3/4] object-cover"
+                loading="lazy"
+              />
+              <figcaption className="px-4 py-3 text-center text-sm text-gray-600">
+                صورة مشاركة من تجربة زراعة
+              </figcaption>
+            </figure>
+
+            <figure className="overflow-hidden rounded-2xl bg-white shadow-lg border border-pink-100">
+              <img
+                src="/manus-storage/atlasio-proof2_bad12e06.jpeg"
+                alt="شتلات صغيرة نامية في أصيص"
+                className="w-full aspect-[3/4] object-cover"
+                loading="lazy"
+              />
+              <figcaption className="px-4 py-3 text-center text-sm text-gray-600">
+                صورة مشاركة من تجربة زراعة
+              </figcaption>
+            </figure>
+          </div>
+        </section>
       </div>
     </div>
   );

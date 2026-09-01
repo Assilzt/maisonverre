@@ -1,6 +1,7 @@
-# Landing page conversion update
+# Social proof images update
 
-- [ ] Add a concise, honest seasonal suitability note for the four flower types.
-- [ ] Review the page for practical conversion improvements that do not invent reviews or claims.
-- [ ] Verify the form, Pixel events, visual layout, and production build.
-- [ ] Save a checkpoint and deliver the updated link with recommendations.
+- [ ] Upload PROOF2.jpeg to persistent project storage.
+- [ ] Show PROOF.jpeg and PROOF2.jpeg together in the social-proof section.
+- [ ] Keep captions neutral and avoid invented reviews or ratings.
+- [ ] Verify responsive layout and production build.
+- [ ] Save and deliver the updated version link.
