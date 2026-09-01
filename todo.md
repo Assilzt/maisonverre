@@ -1,7 +1,6 @@
-# Optional commune field update
+# Seed quantity copy update
 
-- [ ] Add a free-text commune field without a select/list.
-- [ ] Keep the field optional and include it in the Telegram order message when filled.
-- [ ] Clear the field after a successful order.
-- [ ] Verify responsive layout, Pixel flow, and production build.
+- [ ] Add approximate seed counts based on the provided weights.
+- [ ] Use “حوالي” wording and note that counts vary by seed lot and variety.
+- [ ] Verify the updated copy and production build.
 - [ ] Save and deliver the updated version link.

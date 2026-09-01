@@ -419,6 +419,17 @@ export default function Home() {
                   </p>
                 </div>
 
+                <div className="mt-4 rounded-lg border border-pink-100 bg-pink-50/60 p-3" dir="rtl">
+                  <p className="mb-2 text-center text-sm font-semibold text-gray-800">محتوى الباك — أعداد تقريبية</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs leading-5 text-gray-700">
+                    <span>زينيا إيليغانس القزم F1: حوالي 15 بذرة</span>
+                    <span>مارغريت: حوالي 1900 بذرة</span>
+                    <span>كوزموس: حوالي 200 بذرة</span>
+                    <span>قتيفة (كوليوس): حوالي 680 بذرة</span>
+                  </div>
+                  <p className="mt-2 text-center text-[11px] text-gray-500">قد يختلف العدد قليلاً حسب حجم البذور والدفعة.</p>
+                </div>
+
                 <p className="text-center text-xs leading-6 text-gray-600" dir="rtl">
                   الزينيا والكوسموس والقتيفة محبة للدفء؛ قد تزهر من الصيف إلى الخريف المبكر حسب المنطقة والعناية. المارغريت تفضّل الجو المعتدل وقد يقل إزهارها مع الحر الشديد.
                 </p>
