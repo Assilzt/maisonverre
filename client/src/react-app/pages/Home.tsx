@@ -95,13 +95,21 @@ const validatePhone = (value: string): string => {
   return '';
 };
 
-const PRODUCT_EVENT_DATA: Record<string, unknown> = {
+const DEFAULT_PRICE = 1900;
+const SPECIAL_PRICE = 2700;
+
+const getOfferPrice = () => {
+  const requestedPrice = new URLSearchParams(window.location.search).get('price');
+  return requestedPrice === String(SPECIAL_PRICE) ? SPECIAL_PRICE : DEFAULT_PRICE;
+};
+
+const getProductEventData = (price: number): Record<string, unknown> => ({
   content_name: 'باك الربيع الملكي',
   content_ids: ['atlasio-spring-pack'],
   content_type: 'product',
-  value: 1900,
+  value: price,
   currency: 'DZD',
-};
+});
 
 const fireFacebookEvent = (eventName: string, parameters: Record<string, unknown> = {}) => {
   const fbq = (window as Window & { fbq?: (...args: unknown[]) => void }).fbq;
@@ -193,13 +201,15 @@ export default function Home() {
   const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [offerPrice] = useState(getOfferPrice);
   const facebookLeadSentRef = useRef(false);
+  const productEventData = getProductEventData(offerPrice);
   const initiateCheckoutSentRef = useRef(false);
 
   const phoneError = phone ? validatePhone(phone) : '';
 
   useEffect(() => {
-    fireFacebookEventOnce('ViewContent', 'view-content', PRODUCT_EVENT_DATA);
+    fireFacebookEventOnce('ViewContent', `view-content:${offerPrice}`, productEventData);
   }, []);
 
   const trackInitiateCheckout = () => {
@@ -208,7 +218,7 @@ export default function Home() {
     }
 
     initiateCheckoutSentRef.current = true;
-    fireFacebookEventOnce('InitiateCheckout', 'initiate-checkout', PRODUCT_EVENT_DATA);
+    fireFacebookEventOnce('InitiateCheckout', `initiate-checkout:${offerPrice}`, productEventData);
   };
 
   useEffect(() => {
@@ -222,7 +232,7 @@ export default function Home() {
     if (PHONE_PATTERN.test(trimmedPhone) && !facebookLeadSentRef.current && !submitted) {
       facebookLeadSentRef.current = true;
       fireFacebookEventOnce('Lead', `lead:${trimmedPhone}`, {
-        ...PRODUCT_EVENT_DATA,
+        ...productEventData,
         lead_source: 'valid_phone',
       });
     }
@@ -277,7 +287,7 @@ export default function Home() {
     trackInitiateCheckout();
     setIsSubmitting(true);
 
-    const message = `طلب جديد 🌸\nالاسم: ${fullName || '—'}\nالولاية: ${wilaya || '—'}\nالبلدية: ${commune.trim() || '—'}\nرقم الهاتف: ${phone}`;
+    const message = `طلب جديد 🌸\nالاسم: ${fullName || '—'}\nالولاية: ${wilaya || '—'}\nالبلدية: ${commune.trim() || '—'}\nرقم الهاتف: ${phone}\nالسعر: ${offerPrice} دج`;
 
     try {
       const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -292,7 +302,7 @@ export default function Home() {
       });
 
       if (response.ok) {
-        fireFacebookEventOnce('Purchase', `purchase:${phone}`, PRODUCT_EVENT_DATA);
+        fireFacebookEventOnce('Purchase', `purchase:${offerPrice}:${phone}`, productEventData);
         setSubmitted(true);
         setFullName('');
         setWilaya('');
@@ -402,7 +412,7 @@ export default function Home() {
 
                 <div className="text-center py-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
                   <p className="text-base font-semibold text-gray-800" dir="rtl">
-                    سعر الباك: 1900 دج
+                    سعر الباك: {offerPrice} دج
                   </p>
                 </div>
 
