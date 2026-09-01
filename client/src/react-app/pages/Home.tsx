@@ -155,6 +155,30 @@ const getProductEventData = (price: number): Record<string, unknown> => ({
   currency: 'DZD',
 });
 
+const saveOrder = async (payload: {
+  leadId: string;
+  status: 'abandoned' | 'complete';
+  price: number;
+  campaign: string;
+  phone: string;
+  fullName?: string;
+  wilaya?: string;
+  commune?: string;
+}) => {
+  try {
+    await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...payload,
+        sourceUrl: window.location.href,
+      }),
+    });
+  } catch {
+    // Telegram remains the immediate fallback alert if the database is unavailable.
+  }
+};
+
 const fireFacebookEvent = (eventName: string, parameters: Record<string, unknown> = {}) => {
   const fbq = (window as Window & { fbq?: (...args: unknown[]) => void }).fbq;
 
@@ -316,6 +340,13 @@ export default function Home() {
     }
 
     const leadId = getLeadId(trimmedPhone);
+    void saveOrder({
+      leadId,
+      status: 'abandoned',
+      price: offerPrice,
+      campaign: getCampaignLabel(offerPrice),
+      phone: trimmedPhone,
+    });
     const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n📞 الهاتف: ${trimmedPhone}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
 
     void fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -356,6 +387,16 @@ export default function Home() {
     const trimmedPhone = phone.trim();
     const leadId = getLeadId(trimmedPhone);
     const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
+    await saveOrder({
+      leadId,
+      status: 'complete',
+      price: offerPrice,
+      campaign: getCampaignLabel(offerPrice),
+      phone: trimmedPhone,
+      fullName,
+      wilaya,
+      commune: commune.trim(),
+    });
 
     try {
       const leadMessageId = window.sessionStorage.getItem(getLeadMessageStorageKey(trimmedPhone));
