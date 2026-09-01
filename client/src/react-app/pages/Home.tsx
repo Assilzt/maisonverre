@@ -121,6 +121,26 @@ const fireFacebookEvent = (eventName: string, parameters: Record<string, unknown
   }
 };
 
+const fireFacebookEventOnce = (
+  eventName: string,
+  dedupeKey: string,
+  parameters: Record<string, unknown> = {},
+) => {
+  const storageKey = `atlasio:pixel:${dedupeKey}`;
+
+  try {
+    if (window.sessionStorage.getItem(storageKey)) {
+      return;
+    }
+
+    window.sessionStorage.setItem(storageKey, '1');
+  } catch {
+    // Tracking must never block the order flow if storage is unavailable.
+  }
+
+  fireFacebookEvent(eventName, parameters);
+};
+
 function ImageCarousel({ className = '' }: { className?: string }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -214,14 +234,13 @@ export default function Home() {
   const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const abandonedOrderSentRef = useRef(false);
   const facebookLeadSentRef = useRef(false);
   const initiateCheckoutSentRef = useRef(false);
 
   const phoneError = phone ? validatePhone(phone) : '';
 
   useEffect(() => {
-    fireFacebookEvent('ViewContent', PRODUCT_EVENT_DATA);
+    fireFacebookEventOnce('ViewContent', 'view-content', PRODUCT_EVENT_DATA);
   }, []);
 
   const trackInitiateCheckout = () => {
@@ -230,24 +249,53 @@ export default function Home() {
     }
 
     initiateCheckoutSentRef.current = true;
-    fireFacebookEvent('InitiateCheckout', PRODUCT_EVENT_DATA);
+    fireFacebookEventOnce('InitiateCheckout', 'initiate-checkout', PRODUCT_EVENT_DATA);
   };
 
   useEffect(() => {
     const trimmedPhone = phone.trim();
 
     if (!trimmedPhone) {
-      abandonedOrderSentRef.current = false;
       facebookLeadSentRef.current = false;
       return;
     }
 
-    if (PHONE_PATTERN.test(trimmedPhone) && !abandonedOrderSentRef.current) {
-      abandonedOrderSentRef.current = true;
+    if (PHONE_PATTERN.test(trimmedPhone) && !facebookLeadSentRef.current && !submitted) {
+      facebookLeadSentRef.current = true;
+      fireFacebookEventOnce('Lead', `lead:${trimmedPhone}`, {
+        ...PRODUCT_EVENT_DATA,
+        lead_source: 'valid_phone',
+      });
+    }
+
+    if (!PHONE_PATTERN.test(trimmedPhone)) {
+      facebookLeadSentRef.current = false;
+    }
+  }, [phone, submitted]);
+
+  useEffect(() => {
+    const trimmedPhone = phone.trim();
+
+    if (!PHONE_PATTERN.test(trimmedPhone) || submitted) {
+      return;
+    }
+
+    const abandonedStorageKey = `atlasio:abandoned-order:${trimmedPhone}`;
+    const handlePageExit = () => {
+      try {
+        if (window.sessionStorage.getItem(abandonedStorageKey)) {
+          return;
+        }
+
+        // Mark before sending so refreshes or repeated page-exit events cannot duplicate it.
+        window.sessionStorage.setItem(abandonedStorageKey, '1');
+      } catch {
+        // Continue without deduplication if browser storage is unavailable.
+      }
 
       const abandonedMessage = `⚠️ Abandoned Order\n📞 Phone: ${trimmedPhone}${fullName ? `\n👤 Name: ${fullName}` : ''}${wilaya ? `\n📍 Wilaya: ${wilaya}` : ''}${commune ? `\n🏘️ Commune: ${commune}` : ''}`;
 
-      fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      void fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -256,21 +304,12 @@ export default function Home() {
           chat_id: TELEGRAM_CHAT_ID,
           text: abandonedMessage,
         }),
+        keepalive: true,
       }).catch(() => undefined);
-    }
+    };
 
-    if (PHONE_PATTERN.test(trimmedPhone) && !facebookLeadSentRef.current && !submitted) {
-      facebookLeadSentRef.current = true;
-      fireFacebookEvent('Lead', {
-        ...PRODUCT_EVENT_DATA,
-        lead_source: 'valid_phone',
-      });
-    }
-
-    if (!PHONE_PATTERN.test(trimmedPhone)) {
-      abandonedOrderSentRef.current = false;
-      facebookLeadSentRef.current = false;
-    }
+    window.addEventListener('pagehide', handlePageExit);
+    return () => window.removeEventListener('pagehide', handlePageExit);
   }, [phone, fullName, wilaya, commune, submitted]);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -299,13 +338,12 @@ export default function Home() {
       });
 
       if (response.ok) {
-        fireFacebookEvent('Purchase', PRODUCT_EVENT_DATA);
+        fireFacebookEventOnce('Purchase', `purchase:${phone}`, PRODUCT_EVENT_DATA);
         setSubmitted(true);
         setFullName('');
         setWilaya('');
         setCommune('');
         setPhone('');
-        abandonedOrderSentRef.current = false;
         facebookLeadSentRef.current = false;
       } else {
         alert('حدث خطأ. يرجى المحاولة مرة أخرى.');
