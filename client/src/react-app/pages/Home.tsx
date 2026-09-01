@@ -99,7 +99,7 @@ const PRODUCT_EVENT_DATA: Record<string, unknown> = {
   content_name: 'باك الربيع الملكي',
   content_ids: ['atlasio-spring-pack'],
   content_type: 'product',
-  value: 2700,
+  value: 1900,
   currency: 'DZD',
 };
 
@@ -349,7 +349,7 @@ export default function Home() {
 
                 <div className="text-center py-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
                   <p className="text-base font-semibold text-gray-800" dir="rtl">
-                    سعر الباك: 2700 دج
+                    سعر الباك: 1900 دج
                   </p>
                 </div>
 
