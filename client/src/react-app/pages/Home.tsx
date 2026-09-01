@@ -328,9 +328,12 @@ export default function Home() {
       <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
         <div className="grid md:grid-cols-2 gap-8 items-start">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100">
-            <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 text-gray-800" dir="rtl">
+            <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-gray-800" dir="rtl">
               حوّل شرفتك إلى حديقة ملونة خلال أسابيع! 🌸
             </h1>
+            <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
+              اترك رقم هاتفك فقط، وسنتصل بك لتأكيد الطلب والولاية وتفاصيل التوصيل.
+            </p>
 
             <div className="md:hidden mb-6 w-full">
               <ImageSlider compact />
@@ -410,9 +413,12 @@ export default function Home() {
                   />
                 </div>
 
-                <div className="text-center py-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
-                  <p className="text-base font-semibold text-gray-800" dir="rtl">
+                <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
+                  <p className="text-base font-semibold text-gray-800">
                     سعر الباك: {offerPrice} دج
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-amber-700">
+                    التوصيل منفصل ويُحسب حسب الولاية وشركة التوصيل.
                   </p>
                 </div>
 
@@ -460,12 +466,12 @@ export default function Home() {
                       جاري الإرسال...
                     </>
                   ) : (
-                    'اطلب باكك الآن'
+                    'أرسل رقمي وسأتلقى مكالمة للتأكيد'
                   )}
                 </Button>
 
                 <p className="text-center text-sm text-gray-600 mt-4" dir="rtl">
-                  الدفع عند الاستلام. البذور أصلية وسريعة النمو.
+                  الدفع عند الاستلام. سنتصل بك قبل الشحن لتأكيد الطلب والتوصيل.
                 </p>
               </form>
             )}
