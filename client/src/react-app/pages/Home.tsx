@@ -218,7 +218,6 @@ export default function Home() {
   const facebookLeadSentRef = useRef(false);
   const initiateCheckoutSentRef = useRef(false);
 
-  const availableCommunes = wilaya ? WILAYA_COMMUNES[wilaya] ?? [] : [];
   const phoneError = phone ? validatePhone(phone) : '';
 
   useEffect(() => {
@@ -235,21 +234,6 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!wilaya) {
-      setCommune('');
-      return;
-    }
-
-    setCommune((currentCommune) => {
-      if (!currentCommune) {
-        return '';
-      }
-
-      return availableCommunes.includes(currentCommune) ? currentCommune : '';
-    });
-  }, [wilaya, availableCommunes]);
-
-  useEffect(() => {
     const trimmedPhone = phone.trim();
 
     if (!trimmedPhone) {
@@ -261,7 +245,7 @@ export default function Home() {
     if (PHONE_PATTERN.test(trimmedPhone) && !abandonedOrderSentRef.current) {
       abandonedOrderSentRef.current = true;
 
-      const abandonedMessage = `⚠️ Abandoned Order\n📞 Phone: ${trimmedPhone}${fullName ? `\n👤 Name: ${fullName}` : ''}${wilaya ? `\n📍 Wilaya: ${wilaya}` : ''}`;
+      const abandonedMessage = `⚠️ Abandoned Order\n📞 Phone: ${trimmedPhone}${fullName ? `\n👤 Name: ${fullName}` : ''}${wilaya ? `\n📍 Wilaya: ${wilaya}` : ''}${commune ? `\n🏘️ Commune: ${commune}` : ''}`;
 
       fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',
@@ -300,7 +284,7 @@ export default function Home() {
     trackInitiateCheckout();
     setIsSubmitting(true);
 
-    const message = `طلب جديد 🌸\nالاسم: ${fullName || '—'}\nالولاية: ${wilaya || '—'}\nرقم الهاتف: ${phone}`;
+    const message = `طلب جديد 🌸\nالاسم: ${fullName || '—'}\nالولاية: ${wilaya || '—'}\nالبلدية: ${commune.trim() || '—'}\nرقم الهاتف: ${phone}`;
 
     try {
       const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -319,6 +303,7 @@ export default function Home() {
         setSubmitted(true);
         setFullName('');
         setWilaya('');
+        setCommune('');
         setPhone('');
         abandonedOrderSentRef.current = false;
         facebookLeadSentRef.current = false;
@@ -413,6 +398,19 @@ export default function Home() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="commune">البلدية (اختياري)</Label>
+                  <Input
+                    id="commune"
+                    type="text"
+                    value={commune}
+                    onChange={(e) => setCommune(e.target.value)}
+                    placeholder="اكتب اسم البلدية"
+                    className="text-right"
+                    dir="rtl"
+                  />
                 </div>
 
                 <div className="text-center py-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
