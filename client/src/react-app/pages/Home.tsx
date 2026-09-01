@@ -358,34 +358,37 @@ export default function Home() {
     const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
 
     try {
-      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: message,
-        }),
-      });
+      const leadMessageId = window.sessionStorage.getItem(getLeadMessageStorageKey(trimmedPhone));
+      let responseOk = false;
 
-      if (response.ok) {
-        const leadMessageId = window.sessionStorage.getItem(getLeadMessageStorageKey(trimmedPhone));
+      if (leadMessageId) {
+        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT_ID,
+            message_id: Number(leadMessageId),
+            text: message,
+          }),
+        });
+        responseOk = response.ok;
+      } else {
+        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message,
+          }),
+        });
+        responseOk = response.ok;
+      }
 
-        if (leadMessageId) {
-          void fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              chat_id: TELEGRAM_CHAT_ID,
-              message_id: Number(leadMessageId),
-              text: message,
-            }),
-          }).catch(() => undefined);
-        }
-
+      if (responseOk) {
         fireFacebookEventOnce('Purchase', `purchase:${offerPrice}:${trimmedPhone}`, productEventData);
         setSubmitted(true);
         setFullName('');
