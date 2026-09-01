@@ -3,7 +3,7 @@ import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/react-app/components/ui/select';
 import { Label } from '@/react-app/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 const WILAYAS = [
   'الجزائر', 'وهران', 'قسنطينة', 'عنابة', 'البليدة', 'باتنة', 'سطيف', 'سيدي بلعباس', 'بسكرة', 'تلمسان',
@@ -130,6 +130,61 @@ const fireFacebookEventOnce = (
 
   fireFacebookEvent(eventName, parameters);
 };
+
+const IMAGE_SLIDES = [
+  { src: '/images/main-pack.webp', alt: 'باك الربيع الملكي مع أربعة أنواع من الزهور', label: 'الباك الرئيسي' },
+  { src: '/images/proof-flower.webp', alt: 'زهرة برتقالية مزروعة في أصيص', label: 'نتيجة حقيقية' },
+  { src: '/images/proof-pots.webp', alt: 'زهور نامية في أصيصين', label: 'تجربة زراعة' },
+  { src: '/images/proof-seedling.webp', alt: 'شتلات صغيرة نامية في أصيص', label: 'بداية النمو' },
+] as const;
+
+function ImageSlider({ compact = false }: { compact?: boolean }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const activeSlide = IMAGE_SLIDES[activeIndex];
+
+  useEffect(() => {
+    if (isPaused) return;
+    const intervalId = window.setInterval(() => {
+      setActiveIndex((currentIndex) => (currentIndex + 1) % IMAGE_SLIDES.length);
+    }, 5000);
+    return () => window.clearInterval(intervalId);
+  }, [isPaused]);
+
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-2xl bg-white shadow-2xl ${compact ? '' : 'w-full max-w-lg'}`}
+      role="region"
+      aria-label="صور المنتج ونتائج الزراعة"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onFocus={() => setIsPaused(true)}
+      onBlur={() => setIsPaused(false)}
+    >
+      <img
+        src={activeSlide.src}
+        alt={activeSlide.alt}
+        className={`w-full object-cover ${compact ? 'aspect-[4/3]' : 'aspect-square'}`}
+        loading={activeIndex === 0 ? 'eager' : 'lazy'}
+      />
+      <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
+        <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white" dir="rtl">{activeSlide.label}</span>
+        <span className="rounded-full bg-black/60 px-3 py-1 text-xs text-white" dir="ltr">{activeIndex + 1} / {IMAGE_SLIDES.length}</span>
+      </div>
+      <button type="button" onClick={() => setActiveIndex((activeIndex - 1 + IMAGE_SLIDES.length) % IMAGE_SLIDES.length)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg" aria-label="الصورة السابقة">
+        <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+      </button>
+      <button type="button" onClick={() => setActiveIndex((activeIndex + 1) % IMAGE_SLIDES.length)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg" aria-label="الصورة التالية">
+        <ChevronRight className="h-5 w-5" aria-hidden="true" />
+      </button>
+      <div className="absolute inset-x-0 bottom-0 flex justify-center gap-2 bg-gradient-to-t from-black/60 to-transparent px-4 pb-3 pt-8" role="tablist" aria-label="اختيار صورة">
+        {IMAGE_SLIDES.map((slide, index) => (
+          <button key={slide.src} type="button" role="tab" aria-selected={activeIndex === index} aria-label={`عرض ${slide.label}`} onClick={() => setActiveIndex(index)} className={`h-2.5 rounded-full transition-all ${activeIndex === index ? 'w-7 bg-white' : 'w-2.5 bg-white/60 hover:bg-white'}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const [fullName, setFullName] = useState('');
@@ -267,10 +322,8 @@ export default function Home() {
               حوّل شرفتك إلى حديقة ملونة خلال أسابيع! 🌸
             </h1>
 
-            <div className="md:hidden mb-6 rounded-xl bg-gradient-to-br from-emerald-50 to-pink-50 p-5 text-center" dir="rtl">
-              <p className="text-4xl" aria-hidden="true">🌸🌿</p>
-              <p className="mt-2 font-semibold text-emerald-800">باك الربيع الملكي</p>
-              <p className="mt-1 text-sm text-gray-600">بذور مختارة لشرفة مليئة بالحياة</p>
+            <div className="md:hidden mb-6 w-full">
+              <ImageSlider compact />
             </div>
 
             {submitted ? (
@@ -409,17 +462,7 @@ export default function Home() {
           </div>
 
           <div className="hidden md:flex justify-center items-start sticky top-8">
-            <div className="w-full max-w-lg rounded-3xl bg-gradient-to-br from-emerald-700 via-emerald-600 to-pink-400 p-1 shadow-2xl">
-              <div className="rounded-[1.35rem] bg-white/95 p-10 text-center" dir="rtl">
-                <p className="text-7xl" aria-hidden="true">🌸</p>
-                <h2 className="mt-5 text-3xl font-bold text-emerald-900">ازرع فرحتك</h2>
-                <p className="mt-3 text-lg leading-8 text-gray-600">باك واحد، أربعة أنواع من الزهور، وبداية سهلة لحديقتك.</p>
-                <div className="mt-7 grid grid-cols-2 gap-3 text-sm font-semibold text-emerald-800">
-                  <span className="rounded-xl bg-emerald-50 px-3 py-3">بذور أصلية</span>
-                  <span className="rounded-xl bg-pink-50 px-3 py-3">الدفع عند الاستلام</span>
-                </div>
-              </div>
-            </div>
+            <ImageSlider />
           </div>
         </div>
 
