@@ -3,7 +3,7 @@ import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/react-app/components/ui/select';
 import { Label } from '@/react-app/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 const WILAYAS = [
   'الجزائر', 'وهران', 'قسنطينة', 'عنابة', 'البليدة', 'باتنة', 'سطيف', 'سيدي بلعباس', 'بسكرة', 'تلمسان',
@@ -79,6 +79,15 @@ const WILAYA_COMMUNES: Record<string, string[]> = {
 const PHONE_PATTERN = /^(0\d{9}|\+213\d{9})$/;
 
 const PRODUCT_IMAGE = '/manus-storage/MAIN_7c24329e.jpeg';
+const PROOF_IMAGE = '/manus-storage/atlasio-proof_a5825fcc.jpeg';
+const PROOF_IMAGE_2 = '/manus-storage/atlasio-proof2_bad12e06.jpeg';
+
+const IMAGE_SLIDES = [
+  { src: PRODUCT_IMAGE, alt: 'باك الربيع الملكي', label: 'الصورة الرئيسية' },
+  { src: PROOF_IMAGE, alt: 'زهرة برتقالية مزروعة في أصيص', label: 'نتيجة زراعة 1' },
+  { src: PROOF_IMAGE_2, alt: 'شتلات صغيرة نامية في أصيص', label: 'نتيجة زراعة 2' },
+] as const;
+
 const TELEGRAM_BOT_TOKEN = '8028024261:AAGqUaxed7tsD7PoMb1gQ9QPeVp6tGC8JlQ';
 const TELEGRAM_CHAT_ID = '-1003776870179';
 
@@ -111,6 +120,92 @@ const fireFacebookEvent = (eventName: string, parameters: Record<string, unknown
     fbq('track', eventName, parameters);
   }
 };
+
+function ImageCarousel({ className = '' }: { className?: string }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const activeSlide = IMAGE_SLIDES[activeIndex];
+
+  useEffect(() => {
+    if (isPaused) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setActiveIndex((currentIndex) => (currentIndex + 1) % IMAGE_SLIDES.length);
+    }, 2500);
+
+    return () => window.clearInterval(intervalId);
+  }, [isPaused]);
+
+  const goToPrevious = () => {
+    setActiveIndex((currentIndex) => (currentIndex - 1 + IMAGE_SLIDES.length) % IMAGE_SLIDES.length);
+  };
+
+  const goToNext = () => {
+    setActiveIndex((currentIndex) => (currentIndex + 1) % IMAGE_SLIDES.length);
+  };
+
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-2xl bg-white shadow-2xl ${className}`}
+      role="region"
+      aria-label="معرض صور المنتج ونتائج الزراعة"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onFocus={() => setIsPaused(true)}
+      onBlur={() => setIsPaused(false)}
+    >
+      <img
+        key={activeSlide.src}
+        src={activeSlide.src}
+        alt={activeSlide.alt}
+        className="aspect-square w-full object-contain bg-white"
+        loading="eager"
+      />
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-3">
+        <span className="rounded-full bg-black/55 px-3 py-1 text-xs font-semibold text-white" dir="rtl">
+          {activeSlide.label}
+        </span>
+        <span className="rounded-full bg-black/55 px-3 py-1 text-xs text-white" dir="ltr" aria-live="polite">
+          {activeIndex + 1} / {IMAGE_SLIDES.length}
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={goToPrevious}
+        className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+        aria-label="الصورة السابقة"
+      >
+        <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onClick={goToNext}
+        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+        aria-label="الصورة التالية"
+      >
+        <ChevronRight className="h-5 w-5" aria-hidden="true" />
+      </button>
+
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/55 to-transparent px-4 pb-3 pt-8" role="tablist" aria-label="اختيار الصورة">
+        {IMAGE_SLIDES.map((slide, index) => (
+          <button
+            key={slide.src}
+            type="button"
+            role="tab"
+            aria-selected={activeIndex === index}
+            aria-label={`عرض ${slide.label}`}
+            onClick={() => setActiveIndex(index)}
+            className={`h-2.5 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${activeIndex === index ? 'w-7 bg-white' : 'w-2.5 bg-white/60 hover:bg-white/90'}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const [fullName, setFullName] = useState('');
@@ -256,13 +351,7 @@ export default function Home() {
             </h1>
 
             <div className="md:hidden mb-6 w-full">
-              <img 
-                src={PRODUCT_IMAGE}
-                alt="باك الربيع الملكي"
-                className="rounded-xl shadow-lg w-full h-auto object-cover"
-                style={{ maxHeight: '400px' }}
-                loading="eager"
-              />
+              <ImageCarousel className="shadow-lg" />
             </div>
 
             {submitted ? (
@@ -359,12 +448,7 @@ export default function Home() {
           </div>
 
           <div className="hidden md:flex justify-center items-start sticky top-8">
-            <img 
-              src={PRODUCT_IMAGE}
-              alt="باك الربيع الملكي"
-              className="rounded-2xl shadow-2xl max-w-lg w-full object-cover"
-              loading="eager"
-            />
+            <ImageCarousel className="max-w-lg w-full" />
           </div>
         </div>
 

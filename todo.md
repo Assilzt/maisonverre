@@ -1,7 +1,7 @@
-# Social proof images update
+# Multi-media image slider
 
-- [ ] Upload PROOF2.jpeg to persistent project storage.
-- [ ] Show PROOF.jpeg and PROOF2.jpeg together in the social-proof section.
-- [ ] Keep captions neutral and avoid invented reviews or ratings.
-- [ ] Verify responsive layout and production build.
+- [ ] Combine the main image and both social-proof images into one slider.
+- [ ] Add manual previous/next controls and indicators.
+- [ ] Auto-advance every 2.5 seconds and pause while focused or hovered.
+- [ ] Verify mobile/desktop layout, accessibility, and production build.
 - [ ] Save and deliver the updated version link.
