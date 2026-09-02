@@ -1,0 +1,120 @@
+export type EcoTrackSettings = { provider?: string | null; token?: string | null };
+
+const envProvider = process.env.ECOTRACK_PROVIDER || 'navexdelivery';
+const envToken = process.env.ECOTRACK_API_TOKEN || '';
+
+const getConfig = (settings?: EcoTrackSettings) => ({
+  provider: String(settings?.provider || envProvider).trim(),
+  token: String(settings?.token || envToken).trim(),
+});
+
+const getHeaders = (settings?: EcoTrackSettings) => {
+  const { token } = getConfig(settings);
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+};
+
+const getBaseUrl = (settings?: EcoTrackSettings) => `https://${getConfig(settings).provider}.ecotrack.dz/api/v1`;
+
+const ensureToken = (settings?: EcoTrackSettings) => {
+  if (!getConfig(settings).token) throw new Error('ECOTRACK_API_TOKEN غير مضبوط في إعدادات لوحة التحكم');
+};
+
+const normalizePhone = (value: string) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.startsWith('213') && digits.length === 12) return `0${digits.slice(3)}`;
+  if (digits.length === 9) return `0${digits}`;
+  return digits;
+};
+
+const wilayaCode = (value: string) => {
+  const match = String(value || '').match(/^\s*(\d{1,2})/);
+  return match ? String(Number(match[1])) : String(value || '').trim();
+};
+
+export async function fetchEcoTrackFees(settings?: EcoTrackSettings) {
+  ensureToken(settings);
+  const response = await fetch(`${getBaseUrl(settings)}/get/fees`, { headers: getHeaders(settings) });
+  if (!response.ok) throw new Error(`تعذر جلب أسعار التوصيل (${response.status})`);
+  const data = await response.json() as { livraison?: unknown[] };
+  return data.livraison || [];
+}
+
+export async function fetchEcoTrackCommunes(wilaya: string, settings?: EcoTrackSettings) {
+  ensureToken(settings);
+  const response = await fetch(`${getBaseUrl(settings)}/get/communes/${encodeURIComponent(wilayaCode(wilaya))}`, { headers: getHeaders(settings) });
+  if (!response.ok) throw new Error(`تعذر جلب البلديات (${response.status})`);
+  const data = await response.json() as unknown;
+  const items = Array.isArray(data) ? data : ((data as { data?: unknown[]; communes?: unknown[] })?.data || (data as { communes?: unknown[] })?.communes || []);
+  return (items as Array<Record<string, unknown>>).map((item) => ({
+    name: String(item.nom || item.name || item.commune_name || ''),
+    hasStopDesk: Number(item.has_stop_desk ?? 0) === 1,
+  })).filter((item) => item.name);
+}
+
+export async function createEcoTrackParcel(order: {
+  leadId: string;
+  price: number;
+  deliveryFee?: number;
+  phone: string;
+  fullName?: string | null;
+  wilaya?: string | null;
+  commune?: string | null;
+  deliveryType?: string | null;
+}, settings?: EcoTrackSettings) {
+  ensureToken(settings);
+  const phone = normalizePhone(order.phone);
+  if (!/^0[5-7]\d{8}$/.test(phone)) throw new Error('رقم الهاتف غير صالح لـ EcoTrack');
+  if (!order.wilaya || !order.commune) throw new Error('الولاية والبلدية مطلوبتان قبل رفع الشحنة');
+
+  const response = await fetch(`${getBaseUrl(settings)}/create/order`, {
+    method: 'POST',
+    headers: getHeaders(settings),
+    body: JSON.stringify({
+      reference: order.leadId,
+      nom_client: order.fullName || 'زبون Atlasio',
+      telephone: phone,
+      adresse: `${order.commune} - ${order.wilaya}`,
+      commune: order.commune,
+      code_wilaya: wilayaCode(order.wilaya),
+      montant: Math.round(order.price + (order.deliveryFee || 0)),
+      produit: 'باك الربيع الملكي',
+      type: 1,
+      stop_desk: order.deliveryType === 'stop_desk' ? 1 : 0,
+      stock: 0,
+      remarque: `Atlasio ${order.leadId}`,
+      poids: 1,
+    }),
+  });
+
+  const text = await response.text();
+  if (!response.ok) throw new Error(`EcoTrack رفض الشحنة (${response.status}): ${text.slice(0, 240)}`);
+  let data: Record<string, unknown> = {};
+  try { data = JSON.parse(text) as Record<string, unknown>; } catch { /* text response */ }
+  const tracking = data.tracking || data.reference || (data.data as Record<string, unknown> | undefined)?.reference || data.tracking_number || data.order_id;
+  if (!tracking) throw new Error('تم قبول الطلب لكن لم يصل رقم التتبع من EcoTrack');
+  return String(tracking);
+}
+
+export async function fetchEcoTrackOrders(settings?: EcoTrackSettings) {
+  ensureToken(settings);
+  const response = await fetch(`${getBaseUrl(settings)}/get/orders?page=1&limit=100`, { headers: getHeaders(settings) });
+  if (!response.ok) throw new Error(`تعذر جلب حالات EcoTrack (${response.status})`);
+  return response.json() as Promise<{ data?: Array<Record<string, unknown>> }>;
+}
+
+export async function cancelEcoTrackParcel(tracking: string, settings?: EcoTrackSettings) {
+  ensureToken(settings);
+  const response = await fetch(`${getBaseUrl(settings)}/delete/order?tracking=${encodeURIComponent(tracking)}`, { method: 'DELETE', headers: getHeaders(settings) });
+  const data = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok || data.delete !== 'success') throw new Error('تعذر إلغاء الشحنة من EcoTrack');
+  return data;
+}
+
+export function normalizeEcoTrackStatus(value: unknown) {
+  const status = String(value || '').toLowerCase().trim();
+  if (/retour|return|cancel|annul|echec|refus|absent/.test(status)) return 'returned';
+  if (/livr|delivered|encaiss|pay/.test(status)) return 'delivered';
+  if (/cours|transit|hub|picked|ramass/.test(status)) return 'in_transit';
+  if (/pr[eê]t|ready/.test(status)) return 'ready';
+  return status || 'unknown';
+}

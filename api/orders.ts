@@ -1,54 +1,73 @@
 import { neon } from '@neondatabase/serverless';
+import {
+  cancelEcoTrackParcel,
+  createEcoTrackParcel,
+  fetchEcoTrackCommunes,
+  fetchEcoTrackFees,
+  fetchEcoTrackOrders,
+  normalizeEcoTrackStatus,
+} from './_lib/ecotrack.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 const dashboardPassword = process.env.DASHBOARD_PASSWORD;
 const sql = databaseUrl ? neon(databaseUrl) : null;
-
 let schemaReady: Promise<unknown> | null = null;
 
-type Request = {
-  method?: string;
-  body?: unknown;
-  headers: Record<string, string | string[] | undefined>;
+type Request = { method?: string; body?: unknown; query?: Record<string, string | string[] | undefined>; headers: Record<string, string | string[] | undefined> };
+type Response = { status: (code: number) => Response; json: (body: unknown) => void; setHeader: (name: string, value: string) => void };
+
+type OrderRow = {
+  id: number; lead_id: string; status: string; campaign: string; price: number; delivery_fee: number; delivery_type: string | null;
+  phone: string; full_name: string | null; wilaya: string | null; commune: string | null; source_url: string | null;
+  ecotrack_tracking: string | null; ecotrack_status: string | null; created_at: string; updated_at: string;
 };
 
-type Response = {
-  status: (code: number) => Response;
-  json: (body: unknown) => void;
-  setHeader: (name: string, value: string) => void;
-};
+const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, created_at, updated_at`;
 
 const ensureSchema = async () => {
   if (!sql) throw new Error('DATABASE_URL is not configured');
   if (!schemaReady) {
-    schemaReady = sql`
-      CREATE TABLE IF NOT EXISTS atlasio_orders (
-        id BIGSERIAL PRIMARY KEY,
-        lead_id VARCHAR(64) NOT NULL UNIQUE,
-        status VARCHAR(24) NOT NULL DEFAULT 'abandoned',
-        campaign VARCHAR(64) NOT NULL DEFAULT 'الرابط الأساسي',
-        price INTEGER NOT NULL,
-        phone VARCHAR(32) NOT NULL,
-        full_name VARCHAR(160),
-        wilaya VARCHAR(120),
-        commune VARCHAR(160),
-        source_url TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
+    schemaReady = (async () => {
+      await sql!`
+        CREATE TABLE IF NOT EXISTS atlasio_orders (
+          id BIGSERIAL PRIMARY KEY,
+          lead_id VARCHAR(64) NOT NULL UNIQUE,
+          status VARCHAR(24) NOT NULL DEFAULT 'abandoned',
+          campaign VARCHAR(64) NOT NULL DEFAULT 'الرابط الأساسي',
+          price INTEGER NOT NULL,
+          delivery_fee INTEGER NOT NULL DEFAULT 0,
+          delivery_type VARCHAR(24),
+          phone VARCHAR(32) NOT NULL,
+          full_name VARCHAR(160),
+          wilaya VARCHAR(120),
+          commune VARCHAR(160),
+          source_url TEXT,
+          ecotrack_tracking VARCHAR(120),
+          ecotrack_status VARCHAR(120),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS delivery_fee INTEGER NOT NULL DEFAULT 0`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS delivery_type VARCHAR(24)`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS ecotrack_tracking VARCHAR(120)`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS ecotrack_status VARCHAR(120)`;
+      await sql!`
+        CREATE TABLE IF NOT EXISTS atlasio_settings (
+          key VARCHAR(64) PRIMARY KEY,
+          value TEXT NOT NULL DEFAULT '',
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+      await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('ecotrack_provider', 'navexdelivery') ON CONFLICT (key) DO NOTHING`;
+      await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('ecotrack_token', '') ON CONFLICT (key) DO NOTHING`;
+    })();
   }
   await schemaReady;
 };
 
 const getBody = (body: unknown): Record<string, unknown> => {
-  if (typeof body === 'string') {
-    try {
-      return JSON.parse(body) as Record<string, unknown>;
-    } catch {
-      return {};
-    }
-  }
+  if (typeof body === 'string') { try { return JSON.parse(body) as Record<string, unknown>; } catch { return {}; } }
   return (body || {}) as Record<string, unknown>;
 };
 
@@ -58,32 +77,75 @@ const headerValue = (request: Request, name: string) => {
 };
 
 const isAdmin = (request: Request) => Boolean(dashboardPassword && headerValue(request, 'x-dashboard-password') === dashboardPassword);
+const queryValue = (request: Request, name: string) => {
+  const value = request.query?.[name];
+  return Array.isArray(value) ? value[0] : value;
+};
+
+const loadEcoSettings = async () => {
+  const rows = await sql!`SELECT key, value FROM atlasio_settings WHERE key IN ('ecotrack_provider', 'ecotrack_token')` as Array<{ key: string; value: string }>;
+  const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+  return { provider: values.ecotrack_provider || process.env.ECOTRACK_PROVIDER || 'navexdelivery', token: values.ecotrack_token || process.env.ECOTRACK_API_TOKEN || '' };
+};
+
+const rowById = async (id: number) => {
+  const result = await sql!`SELECT ${sql!.unsafe(selectColumns)} FROM atlasio_orders WHERE id = ${id} LIMIT 1`;
+  return result[0] as OrderRow | undefined;
+};
 
 export default async function handler(request: Request, response: Response) {
   response.setHeader('Access-Control-Allow-Origin', '*');
   response.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Dashboard-Password');
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
-
-  if (request.method === 'OPTIONS') {
-    response.status(204).json({});
-    return;
-  }
+  if (request.method === 'OPTIONS') { response.status(204).json({}); return; }
 
   try {
     await ensureSchema();
 
     if (request.method === 'GET') {
-      if (!isAdmin(request)) {
-        response.status(401).json({ error: 'غير مصرح' });
+      const resource = queryValue(request, 'resource');
+      const ecoSettings = await loadEcoSettings();
+      if (resource === 'settings') {
+        if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
+        response.status(200).json({ provider: ecoSettings.provider, tokenConfigured: Boolean(ecoSettings.token) });
         return;
       }
-
-      const orders = await sql!`
-        SELECT id, lead_id, status, campaign, price, phone, full_name, wilaya, commune, source_url, created_at, updated_at
-        FROM atlasio_orders
-        ORDER BY created_at DESC
-        LIMIT 500
-      `;
+      if (resource === 'fees') {
+        response.status(200).json({ fees: await fetchEcoTrackFees(ecoSettings) });
+        return;
+      }
+      if (resource === 'communes') {
+        const wilaya = queryValue(request, 'wilaya');
+        if (!wilaya) { response.status(400).json({ error: 'الولاية مطلوبة' }); return; }
+        response.status(200).json({ communes: await fetchEcoTrackCommunes(wilaya, ecoSettings) });
+        return;
+      }
+      if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
+      if (resource === 'sync') {
+        const remote = await fetchEcoTrackOrders(ecoSettings);
+        const parcels = remote.data || [];
+        let synced = 0;
+        for (const parcel of parcels) {
+          const tracking = String(parcel.tracking || parcel.tracking_number || '');
+          const reference = String(parcel.reference || '');
+          if (!tracking && !reference) continue;
+          const matches = tracking
+            ? await sql!`SELECT id FROM atlasio_orders WHERE ecotrack_tracking = ${tracking} OR lead_id = ${reference} LIMIT 1`
+            : await sql!`SELECT id FROM atlasio_orders WHERE lead_id = ${reference} LIMIT 1`;
+          if (!matches[0]) continue;
+          const normalized = normalizeEcoTrackStatus(parcel.status);
+          const nextStatus = normalized === 'delivered' ? 'delivered' : normalized === 'returned' ? 'returned' : undefined;
+          if (nextStatus) {
+            await sql!`UPDATE atlasio_orders SET ecotrack_tracking = COALESCE(NULLIF(${tracking}, ''), ecotrack_tracking), ecotrack_status = ${String(parcel.status || '')}, status = ${nextStatus}, updated_at = NOW() WHERE id = ${Number(matches[0].id)}`;
+          } else {
+            await sql!`UPDATE atlasio_orders SET ecotrack_tracking = COALESCE(NULLIF(${tracking}, ''), ecotrack_tracking), ecotrack_status = ${String(parcel.status || '')}, updated_at = NOW() WHERE id = ${Number(matches[0].id)}`;
+          }
+          synced += 1;
+        }
+        response.status(200).json({ synced, total: parcels.length });
+        return;
+      }
+      const orders = await sql!`SELECT ${sql!.unsafe(selectColumns)} FROM atlasio_orders ORDER BY created_at DESC LIMIT 500`;
       response.status(200).json({ orders });
       return;
     }
@@ -91,59 +153,66 @@ export default async function handler(request: Request, response: Response) {
     const body = getBody(request.body);
 
     if (request.method === 'PATCH') {
-      if (!isAdmin(request)) {
-        response.status(401).json({ error: 'غير مصرح' });
+      if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
+
+      if (body.resource === 'settings') {
+        const provider = String(body.provider || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+        const token = String(body.token || '').trim();
+        if (!provider) { response.status(400).json({ error: 'اسم الشركة مطلوب' }); return; }
+        await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('ecotrack_provider', ${provider}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+        if (token) await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('ecotrack_token', ${token}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+        response.status(200).json({ provider, tokenConfigured: Boolean(token || (await loadEcoSettings()).token) });
         return;
       }
 
       const orderId = Number(body.id);
       const status = String(body.status || '');
-      const allowedStatuses = ['abandoned', 'complete', 'confirmed', 'cancelled'];
-      if (!Number.isInteger(orderId) || !allowedStatuses.includes(status)) {
-        response.status(400).json({ error: 'بيانات الحالة غير صالحة' });
-        return;
+      const allowedStatuses = ['abandoned', 'complete', 'confirmed', 'cancelled', 'shipped', 'delivered', 'returned'];
+      if (!Number.isInteger(orderId) || !allowedStatuses.includes(status)) { response.status(400).json({ error: 'بيانات الحالة غير صالحة' }); return; }
+      const order = await rowById(orderId);
+      if (!order) { response.status(404).json({ error: 'الطلب غير موجود' }); return; }
+
+      const ecoSettings = await loadEcoSettings();
+      let nextStatus = status;
+      let tracking = order.ecotrack_tracking;
+      let ecotrackStatus = order.ecotrack_status;
+
+      if (status === 'confirmed' && !tracking) {
+        tracking = await createEcoTrackParcel({ leadId: order.lead_id, price: order.price, deliveryFee: order.delivery_fee, phone: order.phone, fullName: order.full_name, wilaya: order.wilaya, commune: order.commune, deliveryType: order.delivery_type }, ecoSettings);
+        nextStatus = 'shipped';
+        ecotrackStatus = 'created';
+      } else if (status === 'cancelled' && tracking) {
+        await cancelEcoTrackParcel(tracking, ecoSettings);
+        tracking = null;
+        ecotrackStatus = 'cancelled';
       }
 
       const updated = await sql!`
-        UPDATE atlasio_orders
-        SET status = ${status}, updated_at = NOW()
-        WHERE id = ${orderId}
-        RETURNING id, lead_id, status, campaign, price, phone, full_name, wilaya, commune, source_url, created_at, updated_at
+        UPDATE atlasio_orders SET status = ${nextStatus}, ecotrack_tracking = ${tracking}, ecotrack_status = ${ecotrackStatus}, updated_at = NOW()
+        WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}
       `;
-      response.status(200).json({ order: updated[0] || null });
+      response.status(200).json({ order: updated[0], message: status === 'confirmed' && tracking ? 'تم التأكيد ورفع الشحنة إلى EcoTrack' : 'تم تحديث حالة الطلب' });
       return;
     }
 
     if (request.method === 'POST') {
       const phone = String(body.phone || '').trim();
       const price = Number(body.price);
-      if (!phone || !Number.isFinite(price)) {
-        response.status(400).json({ error: 'الهاتف والسعر مطلوبان' });
-        return;
-      }
-
+      if (!phone || !Number.isFinite(price)) { response.status(400).json({ error: 'الهاتف والسعر مطلوبان' }); return; }
       const leadId = String(body.leadId || `AT-${Date.now().toString(36).toUpperCase()}`).slice(0, 64);
       const status = body.status === 'complete' ? 'complete' : 'abandoned';
       const campaign = String(body.campaign || 'الرابط الأساسي').slice(0, 64);
+      const deliveryFee = Number(body.deliveryFee || 0);
+      const deliveryType = body.deliveryType ? String(body.deliveryType).slice(0, 24) : null;
       const fullName = body.fullName ? String(body.fullName).slice(0, 160) : null;
       const wilaya = body.wilaya ? String(body.wilaya).slice(0, 120) : null;
       const commune = body.commune ? String(body.commune).slice(0, 160) : null;
       const sourceUrl = body.sourceUrl ? String(body.sourceUrl).slice(0, 1000) : null;
-
       const saved = await sql!`
-        INSERT INTO atlasio_orders (lead_id, status, campaign, price, phone, full_name, wilaya, commune, source_url)
-        VALUES (${leadId}, ${status}, ${campaign}, ${price}, ${phone}, ${fullName}, ${wilaya}, ${commune}, ${sourceUrl})
-        ON CONFLICT (lead_id) DO UPDATE SET
-          status = EXCLUDED.status,
-          campaign = EXCLUDED.campaign,
-          price = EXCLUDED.price,
-          phone = EXCLUDED.phone,
-          full_name = EXCLUDED.full_name,
-          wilaya = EXCLUDED.wilaya,
-          commune = EXCLUDED.commune,
-          source_url = EXCLUDED.source_url,
-          updated_at = NOW()
-        RETURNING id, lead_id, status, campaign, price, phone, full_name, wilaya, commune, source_url, created_at, updated_at
+        INSERT INTO atlasio_orders (lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url)
+        VALUES (${leadId}, ${status}, ${campaign}, ${price}, ${deliveryFee}, ${deliveryType}, ${phone}, ${fullName}, ${wilaya}, ${commune}, ${sourceUrl})
+        ON CONFLICT (lead_id) DO UPDATE SET status = EXCLUDED.status, campaign = EXCLUDED.campaign, price = EXCLUDED.price, delivery_fee = EXCLUDED.delivery_fee, delivery_type = EXCLUDED.delivery_type, phone = EXCLUDED.phone, full_name = EXCLUDED.full_name, wilaya = EXCLUDED.wilaya, commune = EXCLUDED.commune, source_url = EXCLUDED.source_url, updated_at = NOW()
+        RETURNING ${sql!.unsafe(selectColumns)}
       `;
       response.status(200).json({ order: saved[0] });
       return;
@@ -152,13 +221,9 @@ export default async function handler(request: Request, response: Response) {
     response.status(405).json({ error: 'الطريقة غير مدعومة' });
   } catch (error) {
     console.error('Atlasio orders API error', error);
-    response.status(500).json({ error: 'تعذر حفظ الطلب حالياً' });
+    response.status(500).json({ error: error instanceof Error ? error.message : 'تعذر تنفيذ العملية حالياً' });
   }
 }
 
-export const config = {
-  runtime: 'nodejs',
-};
-
+export const config = { runtime: 'nodejs' };
 export { isAdmin };
-

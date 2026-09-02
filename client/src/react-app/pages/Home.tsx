@@ -164,6 +164,8 @@ const saveOrder = async (payload: {
   fullName?: string;
   wilaya?: string;
   commune?: string;
+  deliveryFee?: number;
+  deliveryType?: 'home' | 'stop_desk';
 }) => {
   try {
     await fetch('/api/orders', {
@@ -267,6 +269,9 @@ export default function Home() {
   const [wilaya, setWilaya] = useState('');
   const [commune, setCommune] = useState('');
   const [phone, setPhone] = useState('');
+  const [communes, setCommunes] = useState<Array<{ name: string; hasStopDesk: boolean }>>([]);
+  const [deliveryFees, setDeliveryFees] = useState<Record<string, { home: number; stopDesk: number }>>({});
+  const [deliveryType, setDeliveryType] = useState<'home' | 'stop_desk'>('home');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [limitedOfferEndsAt] = useState(getLimitedOfferEndsAt);
@@ -278,6 +283,38 @@ export default function Home() {
   const initiateCheckoutSentRef = useRef(false);
 
   const phoneError = phone ? validatePhone(phone) : '';
+  const selectedWilayaCode = wilaya.match(/^\s*(\d{1,2})/)?.[1] || '';
+  const selectedFee = deliveryFees[selectedWilayaCode] || { home: 0, stopDesk: 0 };
+  const deliveryFee = deliveryType === 'stop_desk' ? selectedFee.stopDesk : selectedFee.home;
+
+  useEffect(() => {
+    void fetch('/api/orders?resource=fees')
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('fees')))
+      .then((data: { fees?: Array<{ wilaya_id?: string | number; tarif?: number; tarif_stopdesk?: number }> }) => {
+        const mapped: Record<string, { home: number; stopDesk: number }> = {};
+        for (const fee of data.fees || []) {
+          const code = String(fee.wilaya_id || '').replace(/^0+/, '') || String(fee.wilaya_id || '');
+          if (code) mapped[code] = { home: Number(fee.tarif || 0), stopDesk: Number(fee.tarif_stopdesk || fee.tarif || 0) };
+        }
+        setDeliveryFees(mapped);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!wilaya) {
+      setCommunes([]);
+        setCommune('');
+        setDeliveryType('home');
+        return;
+    }
+    setCommune('');
+    setDeliveryType('home');
+    void fetch(`/api/orders?resource=communes&wilaya=${encodeURIComponent(wilaya)}`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('communes')))
+      .then((data: { communes?: Array<{ name: string; hasStopDesk: boolean }> }) => setCommunes(data.communes || []))
+      .catch(() => setCommunes([]));
+  }, [wilaya]);
 
   useEffect(() => {
     if (!limitedOfferEndsAt) return;
@@ -346,8 +383,10 @@ export default function Home() {
       price: offerPrice,
       campaign: getCampaignLabel(offerPrice),
       phone: trimmedPhone,
+      deliveryFee,
+      deliveryType,
     });
-    const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n📞 الهاتف: ${trimmedPhone}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
+    const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee || 'يحدد بعد اختيار الولاية'} دج\n📞 الهاتف: ${trimmedPhone}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
 
     void fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -377,7 +416,8 @@ export default function Home() {
     e.preventDefault();
 
     const validationMessage = validatePhone(phone);
-    if (validationMessage) {
+    if (validationMessage || !fullName.trim() || !wilaya || !commune.trim()) {
+      alert(validationMessage || 'يرجى إكمال الاسم والولاية والبلدية');
       return;
     }
 
@@ -386,7 +426,7 @@ export default function Home() {
 
     const trimmedPhone = phone.trim();
     const leadId = getLeadId(trimmedPhone);
-    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
+    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
     await saveOrder({
       leadId,
       status: 'complete',
@@ -396,6 +436,8 @@ export default function Home() {
       fullName,
       wilaya,
       commune: commune.trim(),
+      deliveryFee,
+      deliveryType,
     });
 
     try {
@@ -554,17 +596,36 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="commune">البلدية (اختياري)</Label>
-                  <Input
-                    id="commune"
-                    type="text"
-                    value={commune}
-                    onChange={(e) => setCommune(e.target.value)}
-                    placeholder="اكتب اسم البلدية"
-                    className="text-right"
-                    dir="rtl"
-                  />
+                  <Label htmlFor="commune">البلدية</Label>
+                  {communes.length > 0 ? (
+                    <Select value={commune} onValueChange={setCommune} disabled={!wilaya}>
+                      <SelectTrigger id="commune" className="text-right" dir="rtl"><SelectValue placeholder="اختر البلدية" /></SelectTrigger>
+                      <SelectContent>{communes.map((item) => <SelectItem key={item.name} value={item.name} className="text-right">{item.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  ) : (
+                    <Input id="commune" type="text" value={commune} onChange={(e) => setCommune(e.target.value)} placeholder={wilaya ? 'اكتب اسم البلدية' : 'اختر الولاية أولاً'} className="text-right" dir="rtl" disabled={!wilaya} />
+                  )}
                 </div>
+
+                {wilaya && (
+                  <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4" dir="rtl">
+                    <p className="text-sm font-bold text-gray-800">اختر طريقة التوصيل</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <label className={`cursor-pointer rounded-lg border p-3 ${deliveryType === 'home' ? 'border-emerald-500 bg-white' : 'border-amber-100 bg-transparent'}`}>
+                        <input className="sr-only" type="radio" checked={deliveryType === 'home'} onChange={() => setDeliveryType('home')} />
+                        <span className="font-semibold">إلى المنزل</span>
+                        <span className="mt-1 block text-xs text-gray-600">{selectedFee.home ? `${selectedFee.home} دج` : 'يحدد حسب الولاية'}</span>
+                      </label>
+                      <label className={`cursor-pointer rounded-lg border p-3 ${deliveryType === 'stop_desk' ? 'border-emerald-500 bg-white' : 'border-amber-100 bg-transparent'}`}>
+                        <input className="sr-only" type="radio" checked={deliveryType === 'stop_desk'} onChange={() => setDeliveryType('stop_desk')} />
+                        <span className="font-semibold">إلى المكتب</span>
+                        <span className="mt-1 block text-xs text-gray-600">{selectedFee.stopDesk ? `${selectedFee.stopDesk} دج` : 'يحدد حسب الولاية'}</span>
+                      </label>
+                    </div>
+                    <p className="text-xs font-medium text-amber-800">التوصيل منفصل عن سعر الباك، ويُحسب حسب الولاية وشركة التوصيل.</p>
+                    {deliveryFee > 0 && <p className="text-sm font-bold text-gray-900">المجموع التقريبي: {offerPrice + deliveryFee} دج</p>}
+                  </div>
+                )}
 
                 <Button
                   type="submit"
