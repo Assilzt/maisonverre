@@ -285,6 +285,8 @@ export default function Home() {
   const selectedWilayaCode = wilaya.match(/^\s*(\d{1,2})/)?.[1] || '';
   const selectedFee = deliveryFees[selectedWilayaCode] || { home: 0, stopDesk: 0 };
   const deliveryFee = deliveryType === 'stop_desk' ? selectedFee.stopDesk : selectedFee.home;
+  const selectedCommune = communes.find((item) => item.name === commune);
+  const canUseStopDesk = Boolean(selectedCommune?.hasStopDesk);
 
   useEffect(() => {
     void fetch('/api/orders?resource=fees')
@@ -596,14 +598,10 @@ export default function Home() {
 
                 <div className="space-y-2">
                   <Label htmlFor="commune">البلدية</Label>
-                  {communes.length > 0 ? (
-                    <Select value={commune} onValueChange={setCommune} disabled={!wilaya}>
-                      <SelectTrigger id="commune" className="text-right" dir="rtl"><SelectValue placeholder="اختر البلدية" /></SelectTrigger>
-                      <SelectContent>{communes.map((item) => <SelectItem key={item.name} value={item.name} className="text-right">{item.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  ) : (
-                    <Input id="commune" type="text" value={commune} onChange={(e) => setCommune(e.target.value)} placeholder={wilaya ? 'اكتب اسم البلدية' : 'اختر الولاية أولاً'} className="text-right" dir="rtl" disabled={!wilaya} />
-                  )}
+                  <Select value={commune} onValueChange={(value) => { setCommune(value); const selected = communes.find((item) => item.name === value); if (selected && !selected.hasStopDesk) setDeliveryType('home'); }} disabled={!wilaya || communes.length === 0}>
+                    <SelectTrigger id="commune" className="text-right" dir="rtl"><SelectValue placeholder={!wilaya ? 'اختر الولاية أولاً' : communes.length ? 'اختر البلدية من القائمة' : 'جاري تحميل بلديات EcoTrack...'} /></SelectTrigger>
+                    <SelectContent>{communes.map((item) => <SelectItem key={item.name} value={item.name} className="text-right">{item.name}</SelectItem>)}</SelectContent>
+                  </Select>
                 </div>
 
                 {wilaya && (
@@ -615,10 +613,10 @@ export default function Home() {
                         <span className="font-semibold">إلى المنزل</span>
                         <span className="mt-1 block text-xs text-gray-600">{selectedFee.home ? `${selectedFee.home} دج` : 'يحدد حسب الولاية'}</span>
                       </label>
-                      <label className={`cursor-pointer rounded-lg border p-3 ${deliveryType === 'stop_desk' ? 'border-emerald-500 bg-white' : 'border-amber-100 bg-transparent'}`}>
-                        <input className="sr-only" type="radio" checked={deliveryType === 'stop_desk'} onChange={() => setDeliveryType('stop_desk')} />
+                      <label className={`cursor-pointer rounded-lg border p-3 ${deliveryType === 'stop_desk' ? 'border-emerald-500 bg-white' : 'border-amber-100 bg-transparent'} ${!canUseStopDesk ? 'cursor-not-allowed opacity-50' : ''}`}>
+                        <input className="sr-only" type="radio" checked={deliveryType === 'stop_desk'} onChange={() => canUseStopDesk && setDeliveryType('stop_desk')} disabled={!canUseStopDesk} />
                         <span className="font-semibold">إلى المكتب</span>
-                        <span className="mt-1 block text-xs text-gray-600">{selectedFee.stopDesk ? `${selectedFee.stopDesk} دج` : 'يحدد حسب الولاية'}</span>
+                        <span className="mt-1 block text-xs text-gray-600">{canUseStopDesk && selectedFee.stopDesk ? `${selectedFee.stopDesk} دج` : 'غير متاح لهذه البلدية'}</span>
                       </label>
                     </div>
                     <p className="text-xs font-medium text-amber-800">التوصيل منفصل عن سعر الباك، ويُحسب حسب الولاية وشركة التوصيل.</p>
