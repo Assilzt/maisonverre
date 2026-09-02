@@ -19,10 +19,10 @@ type Response = { status: (code: number) => Response; json: (body: unknown) => v
 type OrderRow = {
   id: number; lead_id: string; status: string; campaign: string; price: number; delivery_fee: number; delivery_type: string | null;
   phone: string; full_name: string | null; wilaya: string | null; commune: string | null; source_url: string | null;
-  ecotrack_tracking: string | null; ecotrack_status: string | null; created_at: string; updated_at: string;
+  ecotrack_tracking: string | null; ecotrack_status: string | null; status_before_trash: string | null; trashed_at: string | null; created_at: string; updated_at: string;
 };
 
-const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, created_at, updated_at`;
+const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, status_before_trash, trashed_at, created_at, updated_at`;
 const ecoToOfficialWilaya: Record<number, number> = { 57: 49, 58: 50, 51: 51, 50: 52, 52: 53, 49: 54, 55: 55, 56: 56, 53: 57, 54: 58 };
 
 const ensureSchema = async () => {
@@ -53,6 +53,8 @@ const ensureSchema = async () => {
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS delivery_type VARCHAR(24)`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS ecotrack_tracking VARCHAR(120)`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS ecotrack_status VARCHAR(120)`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS status_before_trash VARCHAR(24)`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS trashed_at TIMESTAMPTZ`;
       await sql!`
         CREATE TABLE IF NOT EXISTS atlasio_settings (
           key VARCHAR(64) PRIMARY KEY,
@@ -161,7 +163,7 @@ export default async function handler(request: Request, response: Response) {
           const normalized = normalizeEcoTrackStatus(parcel.status);
           const nextStatus = normalized === 'delivered' ? 'delivered' : normalized === 'returned' ? 'returned' : undefined;
           if (nextStatus) {
-            await sql!`UPDATE atlasio_orders SET ecotrack_tracking = COALESCE(NULLIF(${tracking}, ''), ecotrack_tracking), ecotrack_status = ${String(parcel.status || '')}, status = ${nextStatus}, updated_at = NOW() WHERE id = ${Number(matches[0].id)}`;
+            await sql!`UPDATE atlasio_orders SET ecotrack_tracking = COALESCE(NULLIF(${tracking}, ''), ecotrack_tracking), ecotrack_status = ${String(parcel.status || '')}, status = CASE WHEN status = 'trashed' THEN status ELSE ${nextStatus} END, updated_at = NOW() WHERE id = ${Number(matches[0].id)}`;
           } else {
             await sql!`UPDATE atlasio_orders SET ecotrack_tracking = COALESCE(NULLIF(${tracking}, ''), ecotrack_tracking), ecotrack_status = ${String(parcel.status || '')}, updated_at = NOW() WHERE id = ${Number(matches[0].id)}`;
           }
@@ -216,6 +218,23 @@ export default async function handler(request: Request, response: Response) {
       }
 
       const ecoSettings = await loadEcoSettings();
+      if (body.action === 'trash') {
+        const orderId = Number(body.id);
+        const order = await rowById(orderId);
+        if (!order) { response.status(404).json({ error: 'الطلب غير موجود' }); return; }
+        if (order.status === 'trashed') { response.status(200).json({ order, message: 'الطلب موجود مسبقاً في سلة المهملات' }); return; }
+        const updated = await sql!`UPDATE atlasio_orders SET status = 'trashed', status_before_trash = ${order.status}, trashed_at = NOW(), updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        response.status(200).json({ order: updated[0], message: 'تم نقل الطلب إلى سلة المهملات' }); return;
+      }
+      if (body.action === 'restore') {
+        const orderId = Number(body.id);
+        const order = await rowById(orderId);
+        if (!order) { response.status(404).json({ error: 'الطلب غير موجود' }); return; }
+        if (order.status !== 'trashed') { response.status(409).json({ error: 'الطلب ليس في سلة المهملات' }); return; }
+        const restoredStatus = ['abandoned', 'complete', 'confirmed', 'not_responding', 'cancelled', 'shipped', 'delivered', 'returned'].includes(order.status_before_trash || '') ? order.status_before_trash : 'abandoned';
+        const updated = await sql!`UPDATE atlasio_orders SET status = ${restoredStatus}, status_before_trash = NULL, trashed_at = NULL, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        response.status(200).json({ order: updated[0], message: 'تم استرجاع الطلب من سلة المهملات' }); return;
+      }
       if (body.action === 'ship') {
         const orderId = Number(body.id);
         const order = await rowById(orderId);
