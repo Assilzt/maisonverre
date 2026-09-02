@@ -26,9 +26,15 @@ const normalizePhone = (value: string) => {
   return digits;
 };
 
+const officialToEcoTrack: Record<number, number> = {
+  49: 57, 50: 58, 51: 51, 52: 50, 53: 52, 54: 49, 55: 55, 56: 56, 57: 53, 58: 54,
+};
+
 const wilayaCode = (value: string) => {
   const match = String(value || '').match(/^\s*(\d{1,2})/);
-  return match ? String(Number(match[1])) : String(value || '').trim();
+  const official = match ? Number(match[1]) : Number(value);
+  if (!Number.isInteger(official) || official < 1 || official > 58) return null;
+  return officialToEcoTrack[official] || official;
 };
 
 export async function fetchEcoTrackFees(settings?: EcoTrackSettings) {
@@ -41,7 +47,9 @@ export async function fetchEcoTrackFees(settings?: EcoTrackSettings) {
 
 export async function fetchEcoTrackCommunes(wilaya: string, settings?: EcoTrackSettings) {
   ensureToken(settings);
-  const response = await fetch(`${getBaseUrl(settings)}/get/communes/${encodeURIComponent(wilayaCode(wilaya))}`, { headers: getHeaders(settings) });
+  const code = wilayaCode(wilaya);
+  if (!code) throw new Error('رقم الولاية غير صالح');
+  const response = await fetch(`${getBaseUrl(settings)}/get/communes/${code}`, { headers: getHeaders(settings) });
   if (!response.ok) throw new Error(`تعذر جلب البلديات (${response.status})`);
   const data = await response.json() as unknown;
   const items = Array.isArray(data) ? data : ((data as { data?: unknown[]; communes?: unknown[] })?.data || (data as { communes?: unknown[] })?.communes || []);

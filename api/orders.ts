@@ -23,6 +23,7 @@ type OrderRow = {
 };
 
 const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, created_at, updated_at`;
+const ecoToOfficialWilaya: Record<number, number> = { 57: 49, 58: 50, 51: 51, 50: 52, 52: 53, 49: 54, 55: 55, 56: 56, 53: 57, 54: 58 };
 
 const ensureSchema = async () => {
   if (!sql) throw new Error('DATABASE_URL is not configured');
@@ -111,7 +112,9 @@ export default async function handler(request: Request, response: Response) {
         return;
       }
       if (resource === 'fees') {
-        response.status(200).json({ fees: await fetchEcoTrackFees(ecoSettings) });
+        const rawFees = await fetchEcoTrackFees(ecoSettings) as Array<Record<string, unknown>>;
+        const fees = rawFees.map((fee) => ({ ...fee, wilaya_id: ecoToOfficialWilaya[Number(fee.wilaya_id)] || Number(fee.wilaya_id) }));
+        response.status(200).json({ fees });
         return;
       }
       if (resource === 'communes') {
@@ -154,6 +157,25 @@ export default async function handler(request: Request, response: Response) {
 
     if (request.method === 'PATCH') {
       if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
+
+      if (body.action === 'edit') {
+        const orderId = Number(body.id);
+        const order = await rowById(orderId);
+        if (!order) { response.status(404).json({ error: 'الطلب غير موجود' }); return; }
+        if (order.ecotrack_tracking || order.status === 'shipped' || order.status === 'delivered' || order.status === 'returned') {
+          response.status(409).json({ error: 'لا يمكن تعديل طلب تم رفعه إلى شركة التوصيل' }); return;
+        }
+        const phone = String(body.phone || '').replace(/\D/g, '');
+        const fullName = String(body.fullName || '').trim();
+        const wilaya = String(body.wilaya || '').trim();
+        const commune = String(body.commune || '').trim();
+        if (!/^0[5-7]\d{8}$/.test(phone) || !fullName || !wilaya || !commune) { response.status(400).json({ error: 'الاسم والهاتف والولاية والبلدية مطلوبة بشكل صحيح' }); return; }
+        const deliveryFee = Number(body.deliveryFee || order.delivery_fee || 0);
+        const deliveryType = body.deliveryType ? String(body.deliveryType).slice(0, 24) : order.delivery_type;
+        const updated = await sql!`UPDATE atlasio_orders SET phone = ${phone}, full_name = ${fullName}, wilaya = ${wilaya}, commune = ${commune}, delivery_fee = ${deliveryFee}, delivery_type = ${deliveryType}, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        response.status(200).json({ order: updated[0], message: 'تم تعديل بيانات الطلب' });
+        return;
+      }
 
       if (body.resource === 'settings') {
         const provider = String(body.provider || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
