@@ -113,7 +113,18 @@ export default async function handler(request: Request, response: Response) {
       }
       if (resource === 'fees') {
         const rawFees = await fetchEcoTrackFees(ecoSettings) as Array<Record<string, unknown>>;
-        const fees = rawFees.map((fee) => ({ ...fee, wilaya_id: ecoToOfficialWilaya[Number(fee.wilaya_id)] || Number(fee.wilaya_id) }));
+        const toNumber = (value: unknown) => { const number = Number(value); return Number.isFinite(number) ? number : 0; };
+        const getWilayaId = (fee: Record<string, unknown>) => {
+          const raw = fee.wilaya_id ?? fee.code_wilaya ?? fee.wilaya ?? fee.code ?? fee.id;
+          const match = String(raw ?? '').match(/\d{1,2}/);
+          const ecoId = match ? Number(match[0]) : 0;
+          return ecoToOfficialWilaya[ecoId] || ecoId;
+        };
+        const fees = rawFees.map((fee) => ({
+          wilaya_id: getWilayaId(fee),
+          tarif: toNumber(fee.tarif ?? fee.price ?? fee.home ?? fee.tarif_domicile ?? fee.tarif_home ?? fee.delivery_fee),
+          tarif_stopdesk: toNumber(fee.tarif_stopdesk ?? fee.stop_desk ?? fee.stopdesk ?? fee.price_stopdesk ?? fee.tarif_bureau ?? fee.price ?? fee.tarif ?? fee.home),
+        })).filter((fee) => fee.wilaya_id > 0);
         response.status(200).json({ fees });
         return;
       }
@@ -169,10 +180,10 @@ export default async function handler(request: Request, response: Response) {
         const fullName = String(body.fullName || '').trim();
         const wilaya = String(body.wilaya || '').trim();
         const commune = String(body.commune || '').trim();
-        if (!/^0[5-7]\d{8}$/.test(phone) || !fullName || !wilaya || !commune) { response.status(400).json({ error: 'الاسم والهاتف والولاية والبلدية مطلوبة بشكل صحيح' }); return; }
+        if (!/^0[5-7]\d{8}$/.test(phone) || !wilaya || !commune) { response.status(400).json({ error: 'الهاتف والولاية والبلدية مطلوبة بشكل صحيح' }); return; }
         const deliveryFee = Number(body.deliveryFee || order.delivery_fee || 0);
         const deliveryType = body.deliveryType ? String(body.deliveryType).slice(0, 24) : order.delivery_type;
-        const updated = await sql!`UPDATE atlasio_orders SET phone = ${phone}, full_name = ${fullName}, wilaya = ${wilaya}, commune = ${commune}, delivery_fee = ${deliveryFee}, delivery_type = ${deliveryType}, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        const updated = await sql!`UPDATE atlasio_orders SET phone = ${phone}, full_name = ${fullName || null}, wilaya = ${wilaya}, commune = ${commune}, delivery_fee = ${deliveryFee}, delivery_type = ${deliveryType}, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
         response.status(200).json({ order: updated[0], message: 'تم تعديل بيانات الطلب' });
         return;
       }

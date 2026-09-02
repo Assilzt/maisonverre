@@ -417,8 +417,8 @@ export default function Home() {
     e.preventDefault();
 
     const validationMessage = validatePhone(phone);
-    if (validationMessage || !fullName.trim() || !wilaya || !commune.trim()) {
-      alert(validationMessage || 'يرجى إكمال الاسم والولاية والبلدية');
+    if (validationMessage || !wilaya || !commune.trim()) {
+      alert(validationMessage || 'يرجى إكمال الولاية والبلدية');
       return;
     }
 
