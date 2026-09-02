@@ -157,7 +157,7 @@ export default async function handler(request: Request, response: Response) {
 }
 
 export const config = {
-  runtime: 'nodejs20.x',
+  runtime: 'nodejs',
 };
 
 export { isAdmin };
