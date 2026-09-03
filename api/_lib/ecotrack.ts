@@ -50,12 +50,22 @@ const wilayaCode = (value: string) => {
 };
 
 const canonicalCommuneForEcoTrack = async (wilaya: string, commune: string, settings?: EcoTrackSettings) => {
+  const code = wilayaCode(wilaya);
   const communes = await fetchEcoTrackCommunes(wilaya, settings);
   const selected = canonicalLocationText(commune);
   const match = communes.find((item) => canonicalLocationText(item.name) === selected);
   if (!match) throw new Error(`البلدية «${commune}» غير متاحة في EcoTrack لولاية ${wilaya}`);
-  return match.name;
+  return { name: match.name, code, postalCode: match.codePostal };
 };
+
+export async function fetchEcoTrackWilayas(settings?: EcoTrackSettings) {
+  ensureToken(settings);
+  const response = await fetch(`${getBaseUrl(settings)}/get/wilayas`, { headers: getHeaders(settings) });
+  if (!response.ok) throw new Error(`تعذر جلب قائمة الولايات (${response.status})`);
+  const data = await response.json() as unknown;
+  const items = Array.isArray(data) ? data : ((data as { data?: unknown[]; wilayas?: unknown[] })?.data || (data as { wilayas?: unknown[] })?.wilayas || []);
+  return (items as Array<Record<string, unknown>>).map((item) => ({ id: Number(item.wilaya_id ?? item.id ?? item.code), name: String(item.wilaya_name ?? item.nom ?? item.name ?? '') })).filter((item) => Number.isInteger(item.id) && item.id > 0);
+}
 
 export async function fetchEcoTrackFees(settings?: EcoTrackSettings) {
   ensureToken(settings);
@@ -75,6 +85,7 @@ export async function fetchEcoTrackCommunes(wilaya: string, settings?: EcoTrackS
   const items = Array.isArray(data) ? data : ((data as { data?: unknown[]; communes?: unknown[] })?.data || (data as { communes?: unknown[] })?.communes || []);
   return (items as Array<Record<string, unknown>>).map((item) => ({
     name: String(item.nom || item.name || item.commune_name || ''),
+    codePostal: String(item.code_postal || item.codePostal || '') || null,
     hasStopDesk: Number(item.has_stop_desk ?? 0) === 1,
   })).filter((item) => item.name);
 }
@@ -95,6 +106,10 @@ export async function createEcoTrackParcel(order: {
   if (!order.wilaya || !order.commune) throw new Error('الولاية والبلدية مطلوبتان قبل رفع الشحنة');
   const code = wilayaCode(order.wilaya);
   if (!code) throw new Error('رقم الولاية غير صالح لـ EcoTrack');
+  const supportedWilayas = await fetchEcoTrackWilayas(settings);
+  if (supportedWilayas.length > 0 && !supportedWilayas.some((item) => item.id === code)) {
+    throw new Error(`شركة التوصيل الحالية لا تدعم ولاية ${order.wilaya} في EcoTrack. اطلب تفعيلها من الشركة أو اختر شركة تدعم عين قزام.`);
+  }
   const commune = await canonicalCommuneForEcoTrack(order.wilaya, order.commune, settings);
 
   const response = await fetch(`${getBaseUrl(settings)}/create/order`, {
@@ -104,8 +119,8 @@ export async function createEcoTrackParcel(order: {
       reference: order.leadId,
       nom_client: order.fullName || 'زبون Atlasio',
       telephone: phone,
-      adresse: `${commune} - ${order.wilaya}`,
-      commune,
+      adresse: `${commune.name} - ${order.wilaya}`,
+      commune: commune.name,
       code_wilaya: code,
       montant: Math.round(order.price + (order.deliveryFee || 0)),
       produit: 'باك الربيع الملكي',
