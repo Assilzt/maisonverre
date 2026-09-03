@@ -30,11 +30,31 @@ const officialToEcoTrack: Record<number, number> = {
   49: 57, 50: 58, 51: 51, 52: 50, 53: 52, 54: 49, 55: 55, 56: 56, 57: 53, 58: 54,
 };
 
+const normalizeLocationText = (value: string) => String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[إأآا]/g, 'ا').replace(/[يى]/g, 'ي').replace(/[ة]/g, 'ه').replace(/[\s_-]+/g, ' ');
+const locationAliases: Record<string, string> = {
+  'عين قزام': 'in guezzam',
+  'إن قزام': 'in guezzam',
+  'ain guezzam': 'in guezzam',
+  'in guezzam': 'in guezzam',
+};
+const canonicalLocationText = (value: string) => locationAliases[normalizeLocationText(value)] || normalizeLocationText(value);
+
 const wilayaCode = (value: string) => {
-  const match = String(value || '').match(/^\s*(\d{1,2})/);
-  const official = match ? Number(match[1]) : Number(value);
+  const raw = String(value || '');
+  const match = raw.match(/^\s*(\d{1,2})/);
+  const normalized = canonicalLocationText(raw.replace(/^\s*\d{1,2}\s*[-–:]?\s*/, ''));
+  if (normalized === 'in guezzam') return 54;
+  const official = match ? Number(match[1]) : Number(raw);
   if (!Number.isInteger(official) || official < 1 || official > 58) return null;
   return officialToEcoTrack[official] || official;
+};
+
+const canonicalCommuneForEcoTrack = async (wilaya: string, commune: string, settings?: EcoTrackSettings) => {
+  const communes = await fetchEcoTrackCommunes(wilaya, settings);
+  const selected = canonicalLocationText(commune);
+  const match = communes.find((item) => canonicalLocationText(item.name) === selected);
+  if (!match) throw new Error(`البلدية «${commune}» غير متاحة في EcoTrack لولاية ${wilaya}`);
+  return match.name;
 };
 
 export async function fetchEcoTrackFees(settings?: EcoTrackSettings) {
@@ -73,6 +93,9 @@ export async function createEcoTrackParcel(order: {
   const phone = normalizePhone(order.phone);
   if (!/^0[5-7]\d{8}$/.test(phone)) throw new Error('رقم الهاتف غير صالح لـ EcoTrack');
   if (!order.wilaya || !order.commune) throw new Error('الولاية والبلدية مطلوبتان قبل رفع الشحنة');
+  const code = wilayaCode(order.wilaya);
+  if (!code) throw new Error('رقم الولاية غير صالح لـ EcoTrack');
+  const commune = await canonicalCommuneForEcoTrack(order.wilaya, order.commune, settings);
 
   const response = await fetch(`${getBaseUrl(settings)}/create/order`, {
     method: 'POST',
@@ -81,9 +104,9 @@ export async function createEcoTrackParcel(order: {
       reference: order.leadId,
       nom_client: order.fullName || 'زبون Atlasio',
       telephone: phone,
-      adresse: `${order.commune} - ${order.wilaya}`,
-      commune: order.commune,
-      code_wilaya: wilayaCode(order.wilaya),
+      adresse: `${commune} - ${order.wilaya}`,
+      commune,
+      code_wilaya: code,
       montant: Math.round(order.price + (order.deliveryFee || 0)),
       produit: 'باك الربيع الملكي',
       type: 1,
