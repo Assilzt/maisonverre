@@ -681,11 +681,6 @@ export default function Home() {
                   <p className="mt-3 text-center text-[11px] leading-5 text-gray-500">قد يختلف العدد قليلاً حسب حجم البذور والدفعة.</p>
                 </div>
 
-                <p className="text-center text-xs leading-6 text-gray-600" dir="rtl">
-                  الزينيا والكوسموس والقتيفة محبة للدفء؛ قد تزهر من الصيف إلى الخريف المبكر حسب المنطقة والعناية. المارغريت تفضّل الجو المعتدل وقد يقل إزهارها مع الحر الشديد.
-                </p>
-
-
                 <p className="text-center text-sm text-gray-600 mt-4" dir="rtl">
                   الدفع عند الاستلام. سنتصل بك قبل الشحن لتأكيد الطلب والتوصيل.
                 </p>
