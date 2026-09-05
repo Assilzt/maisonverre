@@ -627,10 +627,10 @@ export default function Home() {
                 <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2" dir="rtl">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="text-right">
-                      <p className="text-xs font-bold text-amber-900">🎁 كتيب العناية بالزهور مجاناً</p>
-                      <p className="text-[11px] text-amber-800">قيمته 300 دج · يُضاف مع طلبك دون تكلفة</p>
+                      <p className="text-xs font-bold text-amber-900">🎁 دليل العناية بالزهور مجاناً</p>
+                      <p className="text-[11px] text-amber-800">قيمته 300 دج · يساعدك تنجح في الزراعة</p>
                     </div>
-                    <button type="button" onClick={() => giftOfferActive && setGiftBookletSelected((value) => !value)} disabled={!giftOfferActive} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${giftBookletSelected && giftOfferActive ? 'bg-emerald-600 text-white' : 'bg-white text-amber-800 shadow-sm'} disabled:cursor-not-allowed disabled:opacity-50`}>{giftBookletSelected && giftOfferActive ? 'تمت الإضافة ✓' : 'احصل عليه مجاناً'}</button>
+                    <button type="button" onClick={() => giftOfferActive && setGiftBookletSelected((value) => !value)} disabled={!giftOfferActive} className={`min-w-[145px] rounded-lg px-4 py-2.5 text-sm font-extrabold transition shadow-sm ${giftBookletSelected && giftOfferActive ? 'bg-emerald-600 text-white ring-2 ring-emerald-200' : 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600 hover:shadow-md'} disabled:cursor-not-allowed disabled:opacity-50`}>{giftBookletSelected && giftOfferActive ? 'تمت الإضافة ✓' : 'أضفه مجاناً لطلبي'}</button>
                   </div>
                   <p className="mt-1 text-[10px] text-amber-700">متوفر مجاناً لمدة {formatCountdown(giftOfferEndsAt - currentTime)}</p>
                 </div>
