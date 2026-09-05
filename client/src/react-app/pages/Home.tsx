@@ -211,8 +211,6 @@ const fireFacebookEventOnce = (
 const IMAGE_SLIDES = [
   { src: '/images/main-pack.webp', alt: 'باك الربيع الملكي مع أربعة أنواع من الزهور', label: 'الباك الرئيسي' },
   { src: '/images/proof-flower.webp', alt: 'زهرة برتقالية مزروعة في أصيص', label: 'نتيجة حقيقية' },
-  { src: '/images/proof-pots.webp', alt: 'زهور نامية في أصيصين', label: 'تجربة زراعة' },
-  { src: '/images/proof-seedling.webp', alt: 'شتلات صغيرة نامية في أصيص', label: 'بداية النمو' },
 ] as const;
 
 function ImageSlider({ compact = false }: { compact?: boolean }) {
@@ -502,10 +500,10 @@ export default function Home() {
         <div className="grid md:grid-cols-2 gap-8 items-start">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100">
             <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-gray-800" dir="rtl">
-              حوّل شرفتك إلى حديقة ملونة خلال أسابيع! 🌸
+              باك واحد، 4 أنواع زهور، وبداية سهلة لشرفة أجمل 🌸
             </h1>
             <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
-              اترك رقم هاتفك فقط، وسنتصل بك لتأكيد الطلب والولاية وتفاصيل التوصيل.
+              تخيل غير كي يزهر البالكون تاعك… علاش تخليه فارغ؟ اختَر موقعك، ونتصل بك قبل الشحن لتأكيد الطلب.
             </p>
 
             {isLimitedOffer && (
@@ -564,6 +562,18 @@ export default function Home() {
                   <p className="mt-1 text-xs font-medium text-amber-700">
                     التوصيل منفصل ويُحسب حسب الولاية وشركة التوصيل.
                   </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center" dir="rtl">
+                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-2 py-2">
+                    <p className="text-[11px] font-bold text-emerald-800">الدفع عند الاستلام</p>
+                  </div>
+                  <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-2 py-2">
+                    <p className="text-[11px] font-bold text-blue-800">نتصل قبل الشحن</p>
+                  </div>
+                  <div className="rounded-lg border border-pink-100 bg-pink-50/70 px-2 py-2">
+                    <p className="text-[11px] font-bold text-pink-800">4 أنواع متنوعة</p>
+                  </div>
                 </div>
 
 
@@ -635,7 +645,7 @@ export default function Home() {
                       جاري الإرسال...
                     </>
                   ) : (
-                    'أرسل رقمي الآن'
+                    'أرسل الطلب للتأكيد'
                   )}
                 </Button>
 
