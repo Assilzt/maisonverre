@@ -564,18 +564,6 @@ export default function Home() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center" dir="rtl">
-                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-2 py-2">
-                    <p className="text-[11px] font-bold text-emerald-800">الدفع عند الاستلام</p>
-                  </div>
-                  <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-2 py-2">
-                    <p className="text-[11px] font-bold text-blue-800">نتصل قبل الشحن</p>
-                  </div>
-                  <div className="rounded-lg border border-pink-100 bg-pink-50/70 px-2 py-2">
-                    <p className="text-[11px] font-bold text-pink-800">4 أنواع متنوعة</p>
-                  </div>
-                </div>
-
 
                 <div className="space-y-2">
                   <Label htmlFor="fullName">الاسم</Label>
@@ -612,6 +600,21 @@ export default function Home() {
                     <SelectTrigger id="commune" className="text-right" dir="rtl"><SelectValue placeholder={!wilaya ? 'اختر الولاية أولاً' : communes.length ? 'اختر البلدية من القائمة' : 'جاري تحميل بلديات EcoTrack...'} /></SelectTrigger>
                     <SelectContent>{communes.map((item) => <SelectItem key={item.name} value={item.name} className="text-right">{item.name}</SelectItem>)}</SelectContent>
                   </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4" dir="rtl">
+                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-2 py-2">
+                    <p className="text-[11px] font-bold text-emerald-800">الدفع عند الاستلام</p>
+                  </div>
+                  <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-2 py-2">
+                    <p className="text-[11px] font-bold text-blue-800">نتصل قبل الشحن</p>
+                  </div>
+                  <div className="rounded-lg border border-pink-100 bg-pink-50/70 px-2 py-2">
+                    <p className="text-[11px] font-bold text-pink-800">4 أنواع متنوعة</p>
+                  </div>
+                  <div className="rounded-lg border border-amber-100 bg-amber-50/70 px-2 py-2">
+                    <p className="text-[11px] font-bold text-amber-800">+100 طلبية بلا شكوى</p>
+                  </div>
                 </div>
 
                 {wilaya && (
@@ -660,19 +663,19 @@ export default function Home() {
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
                       <span className="font-medium text-gray-800">زينيا قزم F1</span>
-                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 15 بذرة</span>
+                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 15 بذرة · حتى 1 م²</span>
                     </div>
                     <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
                       <span className="font-medium text-gray-800">مارغريت</span>
-                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 1900 بذرة</span>
+                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 1900 بذرة · حتى 2 م²</span>
                     </div>
                     <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
                       <span className="font-medium text-gray-800">كوزموس</span>
-                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 200 بذرة</span>
+                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 200 بذرة · حتى 6 م²</span>
                     </div>
                     <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
                       <span className="font-medium text-gray-800">قتيفة (كوليوس)</span>
-                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 680 بذرة</span>
+                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 680 بذرة · حتى 3 م²</span>
                     </div>
                   </div>
                   <p className="mt-3 text-center text-[11px] leading-5 text-gray-500">قد يختلف العدد قليلاً حسب حجم البذور والدفعة.</p>
