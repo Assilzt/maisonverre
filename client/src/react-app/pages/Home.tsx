@@ -99,6 +99,8 @@ const SPECIAL_PRICE = 2700;
 const LIMITED_OFFER_DURATION_MS = 10 * 60 * 1000;
 const isLimitedOffer = new URLSearchParams(window.location.search).get('offer') === 'limited';
 const LIMITED_OFFER_STORAGE_KEY = 'atlasio-limited-offer-ends-at';
+const GIFT_OFFER_DURATION_MS = 5 * 60 * 1000;
+const GIFT_OFFER_STORAGE_KEY = 'atlasio-booklet-gift-ends-at';
 
 const getOfferPrice = () => {
   const requestedPrice = new URLSearchParams(window.location.search).get('price');
@@ -112,6 +114,14 @@ const getLimitedOfferEndsAt = () => {
   if (storedEndsAt > 0) return storedEndsAt;
   const endsAt = Date.now() + LIMITED_OFFER_DURATION_MS;
   window.localStorage.setItem(LIMITED_OFFER_STORAGE_KEY, String(endsAt));
+  return endsAt;
+};
+
+const getGiftOfferEndsAt = () => {
+  const storedEndsAt = Number(window.localStorage.getItem(GIFT_OFFER_STORAGE_KEY));
+  if (storedEndsAt > 0) return storedEndsAt;
+  const endsAt = Date.now() + GIFT_OFFER_DURATION_MS;
+  window.localStorage.setItem(GIFT_OFFER_STORAGE_KEY, String(endsAt));
   return endsAt;
 };
 
@@ -165,6 +175,7 @@ const saveOrder = async (payload: {
   commune?: string;
   deliveryFee?: number;
   deliveryType?: 'home' | 'stop_desk';
+  giftBooklet?: boolean;
 }) => {
   try {
     await fetch('/api/orders', {
@@ -211,6 +222,7 @@ const fireFacebookEventOnce = (
 const IMAGE_SLIDES = [
   { src: '/images/main-pack.webp', alt: 'باك الربيع الملكي مع أربعة أنواع من الزهور', label: 'الباك الرئيسي' },
   { src: '/images/proof-flower.webp', alt: 'زهرة برتقالية مزروعة في أصيص', label: 'نتيجة حقيقية' },
+  { src: '/images/proof-seedling.webp', alt: 'شتلات صغيرة نامية في أصيص', label: 'بداية النمو' },
 ] as const;
 
 function ImageSlider({ compact = false }: { compact?: boolean }) {
@@ -272,9 +284,12 @@ export default function Home() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [limitedOfferEndsAt] = useState(getLimitedOfferEndsAt);
+  const [giftOfferEndsAt] = useState(getGiftOfferEndsAt);
+  const [giftBookletSelected, setGiftBookletSelected] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const facebookLeadSentRef = useRef(false);
   const limitedOfferActive = Boolean(limitedOfferEndsAt && currentTime < limitedOfferEndsAt);
+  const giftOfferActive = currentTime < giftOfferEndsAt;
   const offerPrice = isLimitedOffer && !limitedOfferActive ? SPECIAL_PRICE : getOfferPrice();
   const productEventData = getProductEventData(offerPrice);
   const initiateCheckoutSentRef = useRef(false);
@@ -316,10 +331,13 @@ export default function Home() {
   }, [wilaya]);
 
   useEffect(() => {
-    if (!limitedOfferEndsAt) return;
     const intervalId = window.setInterval(() => setCurrentTime(Date.now()), 1000);
     return () => window.clearInterval(intervalId);
-  }, [limitedOfferEndsAt]);
+  }, []);
+
+  useEffect(() => {
+    if (!giftOfferActive && giftBookletSelected) setGiftBookletSelected(false);
+  }, [giftOfferActive, giftBookletSelected]);
 
   useEffect(() => {
     fireFacebookEventOnce('ViewContent', `view-content:${offerPrice}`, productEventData);
@@ -384,8 +402,9 @@ export default function Home() {
       phone: trimmedPhone,
       deliveryFee,
       deliveryType,
+      giftBooklet: giftBookletSelected && giftOfferActive,
     });
-    const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee || 'يحدد بعد اختيار الولاية'} دج\n📞 الهاتف: ${trimmedPhone}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
+    const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee || 'يحدد بعد اختيار الولاية'} دج\n📞 الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
 
     void fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -425,7 +444,7 @@ export default function Home() {
 
     const trimmedPhone = phone.trim();
     const leadId = getLeadId(trimmedPhone);
-    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
+    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
     await saveOrder({
       leadId,
       status: 'complete',
@@ -437,6 +456,7 @@ export default function Home() {
       commune: commune.trim(),
       deliveryFee,
       deliveryType,
+      giftBooklet: giftBookletSelected && giftOfferActive,
     });
 
     try {
@@ -602,6 +622,17 @@ export default function Home() {
                       <span className="mx-2 rounded-full bg-rose-100 px-2 py-1 text-rose-700">خصم {Math.round(((SPECIAL_PRICE - offerPrice) / SPECIAL_PRICE) * 100)}%</span>
                     </p>
                   )}
+                </div>
+
+                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2" dir="rtl">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-amber-900">🎁 كتيب العناية بالزهور مجاناً</p>
+                      <p className="text-[11px] text-amber-800">قيمته 300 دج · يُضاف مع طلبك دون تكلفة</p>
+                    </div>
+                    <button type="button" onClick={() => giftOfferActive && setGiftBookletSelected((value) => !value)} disabled={!giftOfferActive} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${giftBookletSelected && giftOfferActive ? 'bg-emerald-600 text-white' : 'bg-white text-amber-800 shadow-sm'} disabled:cursor-not-allowed disabled:opacity-50`}>{giftBookletSelected && giftOfferActive ? 'تمت الإضافة ✓' : 'احصل عليه مجاناً'}</button>
+                  </div>
+                  <p className="mt-1 text-[10px] text-amber-700">متوفر مجاناً لمدة {formatCountdown(giftOfferEndsAt - currentTime)}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4" dir="rtl">

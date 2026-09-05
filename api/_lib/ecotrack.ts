@@ -99,6 +99,7 @@ export async function createEcoTrackParcel(order: {
   wilaya?: string | null;
   commune?: string | null;
   deliveryType?: string | null;
+  giftBooklet?: boolean;
 }, settings?: EcoTrackSettings) {
   ensureToken(settings);
   const phone = normalizePhone(order.phone);
@@ -127,7 +128,7 @@ export async function createEcoTrackParcel(order: {
       type: 1,
       stop_desk: order.deliveryType === 'stop_desk' ? 1 : 0,
       stock: 0,
-      remarque: `Atlasio ${order.leadId}`,
+      remarque: `Atlasio ${order.leadId}${order.giftBooklet ? ' - كتيب عناية مجاني' : ''}`,
       poids: 1,
     }),
   });

@@ -19,10 +19,10 @@ type Response = { status: (code: number) => Response; json: (body: unknown) => v
 type OrderRow = {
   id: number; lead_id: string; status: string; campaign: string; price: number; delivery_fee: number; delivery_type: string | null;
   phone: string; full_name: string | null; wilaya: string | null; commune: string | null; source_url: string | null;
-  ecotrack_tracking: string | null; ecotrack_status: string | null; status_before_trash: string | null; trashed_at: string | null; created_at: string; updated_at: string;
+  ecotrack_tracking: string | null; ecotrack_status: string | null; gift_booklet: boolean; status_before_trash: string | null; trashed_at: string | null; created_at: string; updated_at: string;
 };
 
-const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, status_before_trash, trashed_at, created_at, updated_at`;
+const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, gift_booklet, status_before_trash, trashed_at, created_at, updated_at`;
 const ecoToOfficialWilaya: Record<number, number> = { 57: 49, 58: 50, 51: 51, 50: 52, 52: 53, 49: 54, 55: 55, 56: 56, 53: 57, 54: 58 };
 
 const ensureSchema = async () => {
@@ -43,6 +43,7 @@ const ensureSchema = async () => {
           wilaya VARCHAR(120),
           commune VARCHAR(160),
           source_url TEXT,
+          gift_booklet BOOLEAN NOT NULL DEFAULT FALSE,
           ecotrack_tracking VARCHAR(120),
           ecotrack_status VARCHAR(120),
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -53,6 +54,7 @@ const ensureSchema = async () => {
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS delivery_type VARCHAR(24)`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS ecotrack_tracking VARCHAR(120)`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS ecotrack_status VARCHAR(120)`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS gift_booklet BOOLEAN NOT NULL DEFAULT FALSE`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS status_before_trash VARCHAR(24)`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS trashed_at TIMESTAMPTZ`;
       await sql!`
@@ -261,7 +263,7 @@ export default async function handler(request: Request, response: Response) {
         const results: Array<{ leadId: string; tracking?: string; error?: string }> = [];
         for (const order of confirmed) {
           try {
-            const tracking = await createEcoTrackParcel({ leadId: order.lead_id, price: order.price, deliveryFee: order.delivery_fee, phone: order.phone, fullName: order.full_name, wilaya: order.wilaya, commune: order.commune, deliveryType: order.delivery_type }, ecoSettings);
+            const tracking = await createEcoTrackParcel({ leadId: order.lead_id, price: order.price, deliveryFee: order.delivery_fee, phone: order.phone, fullName: order.full_name, wilaya: order.wilaya, commune: order.commune, deliveryType: order.delivery_type, giftBooklet: order.gift_booklet }, ecoSettings);
             await sql!`UPDATE atlasio_orders SET status = 'shipped', ecotrack_tracking = ${tracking}, ecotrack_status = 'created', updated_at = NOW() WHERE id = ${order.id}`;
             results.push({ leadId: order.lead_id, tracking });
           } catch (shipError) { results.push({ leadId: order.lead_id, error: shipError instanceof Error ? shipError.message : 'فشل الرفع' }); }
@@ -294,10 +296,11 @@ export default async function handler(request: Request, response: Response) {
       const wilaya = body.wilaya ? String(body.wilaya).slice(0, 120) : null;
       const commune = body.commune ? String(body.commune).slice(0, 160) : null;
       const sourceUrl = body.sourceUrl ? String(body.sourceUrl).slice(0, 1000) : null;
+      const giftBooklet = body.giftBooklet === true;
       const saved = await sql!`
-        INSERT INTO atlasio_orders (lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url)
-        VALUES (${leadId}, ${status}, ${campaign}, ${price}, ${deliveryFee}, ${deliveryType}, ${phone}, ${fullName}, ${wilaya}, ${commune}, ${sourceUrl})
-        ON CONFLICT (lead_id) DO UPDATE SET status = EXCLUDED.status, campaign = EXCLUDED.campaign, price = EXCLUDED.price, delivery_fee = EXCLUDED.delivery_fee, delivery_type = EXCLUDED.delivery_type, phone = EXCLUDED.phone, full_name = EXCLUDED.full_name, wilaya = EXCLUDED.wilaya, commune = EXCLUDED.commune, source_url = EXCLUDED.source_url, updated_at = NOW()
+        INSERT INTO atlasio_orders (lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, gift_booklet)
+        VALUES (${leadId}, ${status}, ${campaign}, ${price}, ${deliveryFee}, ${deliveryType}, ${phone}, ${fullName}, ${wilaya}, ${commune}, ${sourceUrl}, ${giftBooklet})
+        ON CONFLICT (lead_id) DO UPDATE SET status = EXCLUDED.status, campaign = EXCLUDED.campaign, price = EXCLUDED.price, delivery_fee = EXCLUDED.delivery_fee, delivery_type = EXCLUDED.delivery_type, phone = EXCLUDED.phone, full_name = EXCLUDED.full_name, wilaya = EXCLUDED.wilaya, commune = EXCLUDED.commune, source_url = EXCLUDED.source_url, gift_booklet = EXCLUDED.gift_booklet, updated_at = NOW()
         RETURNING ${sql!.unsafe(selectColumns)}
       `;
       response.status(200).json({ order: saved[0] });
