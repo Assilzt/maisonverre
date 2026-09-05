@@ -555,16 +555,6 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
-                  <p className="text-base font-semibold text-gray-800">
-                    سعر الباك: {offerPrice} دج
-                  </p>
-                  <p className="mt-1 text-xs font-medium text-amber-700">
-                    التوصيل منفصل ويُحسب حسب الولاية وشركة التوصيل.
-                  </p>
-                </div>
-
-
                 <div className="space-y-2">
                   <Label htmlFor="fullName">الاسم</Label>
                   <Input
@@ -600,6 +590,15 @@ export default function Home() {
                     <SelectTrigger id="commune" className="text-right" dir="rtl"><SelectValue placeholder={!wilaya ? 'اختر الولاية أولاً' : communes.length ? 'اختر البلدية من القائمة' : 'جاري تحميل بلديات EcoTrack...'} /></SelectTrigger>
                     <SelectContent>{communes.map((item) => <SelectItem key={item.name} value={item.name} className="text-right">{item.name}</SelectItem>)}</SelectContent>
                   </Select>
+                </div>
+
+                <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
+                  <p className="text-base font-semibold text-gray-800">
+                    سعر الباك: {offerPrice} دج
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-amber-700">
+                    التوصيل منفصل ويُحسب حسب الولاية وشركة التوصيل.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4" dir="rtl">
