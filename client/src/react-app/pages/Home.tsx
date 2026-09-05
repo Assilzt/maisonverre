@@ -594,11 +594,14 @@ export default function Home() {
 
                 <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
                   <p className="text-base font-semibold text-gray-800">
-                    سعر الباك: {offerPrice} دج
+                    سعر الباك: <span className="text-xl font-extrabold text-emerald-700">{offerPrice} دج</span>
                   </p>
-                  <p className="mt-1 text-xs font-medium text-amber-700">
-                    التوصيل منفصل ويُحسب حسب الولاية وشركة التوصيل.
-                  </p>
+                  {offerPrice < SPECIAL_PRICE && (
+                    <p className="mt-1 text-xs font-semibold text-gray-500">
+                      <span className="line-through">2700 دج</span>
+                      <span className="mx-2 rounded-full bg-rose-100 px-2 py-1 text-rose-700">خصم {Math.round(((SPECIAL_PRICE - offerPrice) / SPECIAL_PRICE) * 100)}%</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4" dir="rtl">
