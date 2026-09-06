@@ -591,6 +591,10 @@ export default function Home() {
             <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-gray-800" dir="rtl">
               باك واحد، 4 أنواع زهور، وبداية سهلة لشرفة أجمل 🌸
             </h1>
+            <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm" dir="rtl">
+              <p className="text-base font-extrabold text-emerald-800">🌸 تكفي لتزيين حتى 9 متر مربع من حديقتك</p>
+            </div>
+
             <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
               تخيل غير كي يزهر البالكون تاعك… علاش تخليه فارغ؟ اختَر موقعك، ونتصل بك قبل الشحن لتأكيد الطلب.
             </p>
@@ -642,8 +646,8 @@ export default function Home() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         required
-                        placeholder="0551234567 أو +213551234567"
-                        className="border-2 border-pink-200 bg-pink-50/40 px-4 py-3 pr-12 text-right text-base font-medium shadow-sm transition focus:border-pink-500 focus:ring-4 focus:ring-pink-100"
+                        placeholder="رقم الهاتف"
+                        className="border-2 border-pink-200 bg-pink-50/30 px-4 py-3 pr-12 text-right text-base font-medium shadow-sm transition focus:border-pink-500 focus:ring-4 focus:ring-pink-100 placeholder:text-gray-400"
                         dir="rtl"
                         aria-invalid={Boolean(phoneError)}
                       />
@@ -761,7 +765,7 @@ export default function Home() {
 
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold text-lg py-6"
+                  className="w-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:via-amber-600 hover:to-orange-700 text-white font-black text-lg py-6 shadow-lg shadow-orange-300/50 transition-all duration-200 active:scale-[0.99]"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
