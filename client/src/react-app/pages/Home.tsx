@@ -221,7 +221,6 @@ const fireFacebookEventOnce = (
 
 const IMAGE_SLIDES = [
   { src: '/images/main-pack.webp', alt: 'باك الربيع الملكي مع أربعة أنواع من الزهور', label: 'الباك الرئيسي' },
-  { src: '/images/proof-flower.webp', alt: 'زهرة برتقالية مزروعة في أصيص', label: 'نتيجة حقيقية' },
   { src: '/images/proof-seedling.webp', alt: 'شتلات صغيرة نامية في أصيص', label: 'بداية النمو' },
 ] as const;
 
@@ -287,6 +286,9 @@ export default function Home() {
   const [giftOfferEndsAt] = useState(getGiftOfferEndsAt);
   const [giftBookletSelected, setGiftBookletSelected] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
+  const hasAutoFocusedPhoneRef = useRef(false);
+  const userInteractedRef = useRef(false);
   const facebookLeadSentRef = useRef(false);
   const limitedOfferActive = Boolean(limitedOfferEndsAt && currentTime < limitedOfferEndsAt);
   const giftOfferActive = currentTime < giftOfferEndsAt;
@@ -338,6 +340,51 @@ export default function Home() {
   useEffect(() => {
     if (!giftOfferActive && giftBookletSelected) setGiftBookletSelected(false);
   }, [giftOfferActive, giftBookletSelected]);
+
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      userInteractedRef.current = true;
+    };
+
+    window.addEventListener('pointerdown', handleUserInteraction, { passive: true });
+    window.addEventListener('keydown', handleUserInteraction, { passive: true });
+    window.addEventListener('touchstart', handleUserInteraction, { passive: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (hasAutoFocusedPhoneRef.current || userInteractedRef.current) return;
+
+    const tryFocusPhone = () => {
+      if (hasAutoFocusedPhoneRef.current || userInteractedRef.current) return;
+      const input = phoneInputRef.current;
+      if (!input) return;
+
+      const form = document.getElementById('lead-form');
+      const formRect = form?.getBoundingClientRect();
+      const isNearViewport = Boolean(formRect) && formRect!.top < window.innerHeight + 180 && formRect!.bottom > 0;
+
+      if (!isNearViewport) return;
+      if (document.activeElement && document.activeElement !== document.body && document.activeElement !== input) return;
+
+      input.focus({ preventScroll: true });
+      hasAutoFocusedPhoneRef.current = true;
+    };
+
+    const timeoutId = window.setTimeout(tryFocusPhone, 5000 + Math.random() * 9000);
+    const handleScroll = () => { if (!hasAutoFocusedPhoneRef.current) tryFocusPhone(); };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   useEffect(() => {
     fireFacebookEventOnce('ViewContent', `view-content:${offerPrice}`, productEventData);
@@ -556,12 +603,14 @@ export default function Home() {
                 </Button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} onFocus={trackInitiateCheckout} className="space-y-4">
+              <form id="lead-form" onSubmit={handleSubmit} onFocus={trackInitiateCheckout} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone">رقم الهاتف</Label>
                   <Input
+                    ref={phoneInputRef}
                     id="phone"
                     type="tel"
+                    autoComplete="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     required
@@ -580,6 +629,7 @@ export default function Home() {
                   <Input
                     id="fullName"
                     type="text"
+                    autoComplete="name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="أدخل اسمك"
@@ -624,16 +674,18 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2" dir="rtl">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-right">
-                      <p className="text-xs font-bold text-amber-900">🎁 دليل العناية بالزهور مجاناً</p>
-                      <p className="text-[11px] text-amber-800">قيمته 300 دج · يساعدك تنجح في الزراعة</p>
+                {giftOfferActive && (
+                  <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2" dir="rtl">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-right">
+                        <p className="text-xs font-bold text-amber-900">🎁 دليل العناية بالزهور مجاناً</p>
+                        <p className="text-[11px] text-amber-800">قيمته 300 دج · يساعدك تنجح في الزراعة</p>
+                      </div>
+                      <button type="button" onClick={() => setGiftBookletSelected((value) => !value)} className={`min-w-[145px] rounded-lg px-4 py-2.5 text-sm font-extrabold transition shadow-sm ${giftBookletSelected ? 'bg-emerald-600 text-white ring-2 ring-emerald-200' : 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600 hover:shadow-md'}`}>{giftBookletSelected ? 'تمت الإضافة ✓' : 'أضفه مجاناً لطلبي'}</button>
                     </div>
-                    <button type="button" onClick={() => giftOfferActive && setGiftBookletSelected((value) => !value)} disabled={!giftOfferActive} className={`min-w-[145px] rounded-lg px-4 py-2.5 text-sm font-extrabold transition shadow-sm ${giftBookletSelected && giftOfferActive ? 'bg-emerald-600 text-white ring-2 ring-emerald-200' : 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600 hover:shadow-md'} disabled:cursor-not-allowed disabled:opacity-50`}>{giftBookletSelected && giftOfferActive ? 'تمت الإضافة ✓' : 'أضفه مجاناً لطلبي'}</button>
+                    <p className="mt-1 text-[10px] text-amber-700">متوفر مجاناً لمدة {formatCountdown(giftOfferEndsAt - currentTime)}</p>
                   </div>
-                  <p className="mt-1 text-[10px] text-amber-700">متوفر مجاناً لمدة {formatCountdown(giftOfferEndsAt - currentTime)}</p>
-                </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4" dir="rtl">
                   <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-2 py-2">
