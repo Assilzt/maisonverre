@@ -5,6 +5,7 @@ import {
   fetchEcoTrackCommunes,
   fetchEcoTrackFees,
   fetchEcoTrackOrders,
+  fetchEcoTrackProducts,
   normalizeEcoTrackStatus,
 } from './_lib/ecotrack.js';
 
@@ -149,8 +150,17 @@ export default async function handler(request: Request, response: Response) {
       }
       if (resource === 'stock') {
         if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
-        const products = await sql!`SELECT id, name, sku, quantity, active, created_at, updated_at FROM atlasio_stock_products WHERE active = TRUE ORDER BY name ASC` as StockProduct[];
-        response.status(200).json({ products });
+        const requestedProviderId = queryValue(request, 'providerId') || ecoSettings.providerId;
+        const providerSettings = await loadEcoSettings(requestedProviderId);
+        const remoteProducts = await fetchEcoTrackProducts(providerSettings);
+        await sql!`ALTER TABLE atlasio_stock_products ADD COLUMN IF NOT EXISTS provider_id VARCHAR(64)`;
+        await sql!`ALTER TABLE atlasio_stock_products ADD COLUMN IF NOT EXISTS provider_product_id VARCHAR(160)`;
+        await sql!`DELETE FROM atlasio_stock_products WHERE provider_id = ${providerSettings.providerId}`;
+        for (const product of remoteProducts) {
+          await sql!`INSERT INTO atlasio_stock_products (name, sku, quantity, active, provider_id, provider_product_id) VALUES (${product.name.slice(0, 160)}, ${product.reference}, ${Math.floor(product.quantity)}, TRUE, ${providerSettings.providerId}, ${product.id})`;
+        }
+        const products = await sql!`SELECT id, name, sku, quantity, active, created_at, updated_at FROM atlasio_stock_products WHERE active = TRUE AND provider_id = ${providerSettings.providerId} ORDER BY name ASC` as StockProduct[];
+        response.status(200).json({ products, providerId: providerSettings.providerId, providerName: providerSettings.providerName, synced: remoteProducts.length });
         return;
       }
       if (resource === 'fees') {

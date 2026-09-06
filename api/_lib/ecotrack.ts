@@ -67,6 +67,23 @@ export async function fetchEcoTrackWilayas(settings?: EcoTrackSettings) {
   return (items as Array<Record<string, unknown>>).map((item) => ({ id: Number(item.wilaya_id ?? item.id ?? item.code), name: String(item.wilaya_name ?? item.nom ?? item.name ?? '') })).filter((item) => Number.isInteger(item.id) && item.id > 0);
 }
 
+export type EcoTrackProduct = { id: string; name: string; reference: string | null; quantity: number; active: boolean };
+
+export async function fetchEcoTrackProducts(settings?: EcoTrackSettings) {
+  ensureToken(settings);
+  const response = await fetch(`${getBaseUrl(settings)}/get/products/list`, { headers: getHeaders(settings) });
+  if (!response.ok) throw new Error(`تعذر جلب منتجات المخزون (${response.status})`);
+  const data = await response.json() as unknown;
+  const items = Array.isArray(data) ? data : ((data as { products?: unknown[]; data?: unknown[] })?.products || (data as { data?: unknown[] })?.data || []);
+  return (items as Array<Record<string, unknown>>).map((item) => ({
+    id: String(item.id ?? item.product_id ?? item.reference ?? item.ref ?? ''),
+    name: String(item.name ?? item.nom ?? item.product_name ?? item.produit ?? ''),
+    reference: item.reference ?? item.ref ?? item.sku ? String(item.reference ?? item.ref ?? item.sku) : null,
+    quantity: Math.max(0, Number(item.quantity ?? item.stock ?? item.qty ?? 0) || 0),
+    active: item.active !== false && item.is_active !== false,
+  })).filter((item) => item.id && item.name && item.active);
+}
+
 export async function fetchEcoTrackFees(settings?: EcoTrackSettings) {
   ensureToken(settings);
   const response = await fetch(`${getBaseUrl(settings)}/get/fees`, { headers: getHeaders(settings) });
