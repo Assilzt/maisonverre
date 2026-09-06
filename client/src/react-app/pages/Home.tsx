@@ -224,6 +224,13 @@ const IMAGE_SLIDES = [
   { src: '/images/proof-seedling.webp', alt: 'شتلات صغيرة نامية في أصيص', label: 'بداية النمو' },
 ] as const;
 
+const FLOWER_TYPES = [
+  { name: 'زينيا قزم F1', emoji: '🌼', accent: 'bg-rose-100 text-rose-700', seeds: 'حوالي 15 بذرة', area: 'حتى 1 م²' },
+  { name: 'مارغريت', emoji: '🌻', accent: 'bg-amber-100 text-amber-700', seeds: 'حوالي 1900 بذرة', area: 'حتى 2 م²' },
+  { name: 'كوزموس', emoji: '🌸', accent: 'bg-pink-100 text-pink-700', seeds: 'حوالي 200 بذرة', area: 'حتى 6 م²' },
+  { name: 'قتيفة (كوليوس)', emoji: '🌿', accent: 'bg-emerald-100 text-emerald-700', seeds: 'حوالي 680 بذرة', area: 'حتى 3 م²' },
+] as const;
+
 function ImageSlider({ compact = false }: { compact?: boolean }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -395,9 +402,24 @@ export default function Home() {
       return;
     }
 
+    const hasMeaningfulInput = Boolean(phone.trim() || fullName.trim() || wilaya || commune);
+    if (!hasMeaningfulInput) {
+      return;
+    }
+
     initiateCheckoutSentRef.current = true;
-    fireFacebookEventOnce('InitiateCheckout', `initiate-checkout:${offerPrice}`, productEventData);
+    fireFacebookEventOnce('InitiateCheckout', `initiate-checkout:${offerPrice}:${phone.trim() || 'no-phone'}`, {
+      ...productEventData,
+      lead_source: phone.trim() ? 'form_started' : 'form_engaged',
+    });
   };
+
+  useEffect(() => {
+    if (!phone && !fullName && !wilaya && !commune) {
+      return;
+    }
+    trackInitiateCheckout();
+  }, [phone, fullName, wilaya, commune]);
 
   useEffect(() => {
     const trimmedPhone = phone.trim();
@@ -603,64 +625,79 @@ export default function Home() {
                 </Button>
               </div>
             ) : (
-              <form id="lead-form" onSubmit={handleSubmit} onFocus={trackInitiateCheckout} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">رقم الهاتف</Label>
-                  <Input
-                    ref={phoneInputRef}
-                    id="phone"
-                    type="tel"
-                    autoComplete="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                    placeholder="0551234567 أو +213551234567"
-                    className="text-right"
-                    dir="rtl"
-                    aria-invalid={Boolean(phoneError)}
-                  />
-                  {phone && phoneError && (
-                    <p className="text-sm text-red-600" dir="rtl">{phoneError}</p>
-                  )}
-                </div>
+              <div className="rounded-3xl border border-pink-100 bg-white/95 p-4 shadow-[0_8px_30px_rgba(244,114,182,0.08)] ring-1 ring-white/60 md:p-6">
+                <form id="lead-form" onSubmit={handleSubmit} onFocus={trackInitiateCheckout} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="flex items-center gap-2 text-base font-bold text-gray-800">
+                      <span className="text-lg">📱</span>
+                      <span>رقم الهاتف</span>
+                    </Label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-lg text-pink-500">📱</span>
+                      <Input
+                        ref={phoneInputRef}
+                        id="phone"
+                        type="tel"
+                        autoComplete="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        placeholder="0551234567 أو +213551234567"
+                        className="border-2 border-pink-200 bg-pink-50/40 px-4 py-3 pr-12 text-right text-base font-medium shadow-sm transition focus:border-pink-500 focus:ring-4 focus:ring-pink-100"
+                        dir="rtl"
+                        aria-invalid={Boolean(phoneError)}
+                      />
+                    </div>
+                    {phone && phoneError && (
+                      <p className="text-sm text-red-600" dir="rtl">{phoneError}</p>
+                    )}
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">الاسم</Label>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    autoComplete="name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="أدخل اسمك"
-                    className="text-right"
-                    dir="rtl"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName" className="flex items-center gap-2 text-base font-bold text-gray-800">
+                      <span className="text-lg">👤</span>
+                      <span>الاسم</span>
+                    </Label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-lg text-emerald-600">👤</span>
+                      <Input
+                        id="fullName"
+                        type="text"
+                        autoComplete="name"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="أدخل اسمك الكامل"
+                        className="border-2 border-emerald-200 bg-emerald-50/40 px-4 py-3 pr-12 text-right text-base font-medium shadow-sm transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                        dir="rtl"
+                      />
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="wilaya">الولاية</Label>
-                  <Select value={wilaya} onValueChange={(value) => setWilaya(value)}>
-                    <SelectTrigger id="wilaya" className="text-right" dir="rtl">
-                      <SelectValue placeholder="اختر الولاية" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {WILAYAS.map((w) => (
-                        <SelectItem key={w} value={w} className="text-right">
-                          {w}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="wilaya" className="text-base font-bold text-gray-800">الولاية</Label>
+                      <Select value={wilaya} onValueChange={(value) => setWilaya(value)}>
+                        <SelectTrigger id="wilaya" className="h-12 border-2 border-amber-200 bg-amber-50/40 px-4 text-right text-base font-medium shadow-sm focus:ring-4 focus:ring-amber-100" dir="rtl">
+                          <SelectValue placeholder="اختر الولاية" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {WILAYAS.map((w) => (
+                            <SelectItem key={w} value={w} className="text-right">
+                              {w}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="commune">البلدية</Label>
-                  <Select value={commune} onValueChange={(value) => { setCommune(value); const selected = communes.find((item) => item.name === value); if (selected && !selected.hasStopDesk) setDeliveryType('home'); }} disabled={!wilaya || communes.length === 0}>
-                    <SelectTrigger id="commune" className="text-right" dir="rtl"><SelectValue placeholder={!wilaya ? 'اختر الولاية أولاً' : communes.length ? 'اختر البلدية من القائمة' : 'جاري تحميل بلديات EcoTrack...'} /></SelectTrigger>
-                    <SelectContent>{communes.map((item) => <SelectItem key={item.name} value={item.name} className="text-right">{item.name}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="commune" className="text-base font-bold text-gray-800">البلدية</Label>
+                      <Select value={commune} onValueChange={(value) => { setCommune(value); const selected = communes.find((item) => item.name === value); if (selected && !selected.hasStopDesk) setDeliveryType('home'); }} disabled={!wilaya || communes.length === 0}>
+                        <SelectTrigger id="commune" className="h-12 border-2 border-amber-200 bg-amber-50/40 px-4 text-right text-base font-medium shadow-sm focus:ring-4 focus:ring-amber-100 disabled:cursor-not-allowed disabled:opacity-70" dir="rtl"><SelectValue placeholder={!wilaya ? 'اختر الولاية أولاً' : communes.length ? 'اختر البلدية من القائمة' : 'جاري تحميل بلديات EcoTrack...'} /></SelectTrigger>
+                        <SelectContent>{communes.map((item) => <SelectItem key={item.name} value={item.name} className="text-right">{item.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
                 <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
                   <p className="text-base font-semibold text-gray-800">
@@ -737,7 +774,11 @@ export default function Home() {
                   )}
                 </Button>
 
-                <div className="mt-4 overflow-hidden rounded-xl border border-pink-200 bg-gradient-to-br from-white via-pink-50/70 to-emerald-50/80 p-4 shadow-sm" dir="rtl">
+                <div className="mt-4 overflow-hidden rounded-2xl border border-pink-200 bg-gradient-to-br from-white via-pink-50/70 to-emerald-50/80 p-4 shadow-sm" dir="rtl">
+                  <div className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm">
+                    <p className="text-[15px] font-bold text-emerald-800">🌸 تكفي لتزيين حتى 9 متر مربع من حديقتك</p>
+                  </div>
+
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold tracking-wide text-pink-600">محتوى الباك</p>
@@ -745,24 +786,21 @@ export default function Home() {
                     </div>
                     <span className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-gray-600 shadow-sm">أعداد تقريبية</span>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
-                      <span className="font-medium text-gray-800">زينيا قزم F1</span>
-                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 15 بذرة · حتى 1 م²</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
-                      <span className="font-medium text-gray-800">مارغريت</span>
-                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 1900 بذرة · حتى 2 م²</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
-                      <span className="font-medium text-gray-800">كوزموس</span>
-                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 200 بذرة · حتى 6 م²</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-xs shadow-sm">
-                      <span className="font-medium text-gray-800">قتيفة (كوليوس)</span>
-                      <span className="whitespace-nowrap font-semibold text-emerald-700">حوالي 680 بذرة · حتى 3 م²</span>
-                    </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {FLOWER_TYPES.map((flower) => (
+                      <div key={flower.name} className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/80 p-2.5 shadow-sm">
+                        <div className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl shadow-inner ${flower.accent}`} aria-hidden="true">
+                          {flower.emoji}
+                        </div>
+                        <div className="min-w-0 flex-1 text-right">
+                          <p className="text-sm font-extrabold text-gray-900">{flower.name}</p>
+                          <p className="mt-0.5 text-[11px] text-gray-600">{flower.seeds} · {flower.area}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+
                   <p className="mt-3 text-center text-[11px] leading-5 text-gray-500">قد يختلف العدد قليلاً حسب حجم البذور والدفعة.</p>
                 </div>
 
@@ -770,6 +808,7 @@ export default function Home() {
                   الدفع عند الاستلام. سنتصل بك قبل الشحن لتأكيد الطلب والتوصيل.
                 </p>
               </form>
+            </div>
             )}
           </div>
 
