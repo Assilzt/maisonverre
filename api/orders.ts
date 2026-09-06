@@ -16,13 +16,17 @@ let schemaReady: Promise<unknown> | null = null;
 type Request = { method?: string; body?: unknown; query?: Record<string, string | string[] | undefined>; headers: Record<string, string | string[] | undefined> };
 type Response = { status: (code: number) => Response; json: (body: unknown) => void; setHeader: (name: string, value: string) => void };
 
+type ShippingProvider = { id: string; name: string; provider: string; token: string; deliveryFees: Record<string, { home: number; stopDesk: number }> };
+
+type StockProduct = { id: number; name: string; sku: string | null; quantity: number; active: boolean; created_at: string; updated_at: string };
+
 type OrderRow = {
   id: number; lead_id: string; status: string; campaign: string; price: number; delivery_fee: number; delivery_type: string | null;
   phone: string; full_name: string | null; wilaya: string | null; commune: string | null; source_url: string | null;
-  ecotrack_tracking: string | null; ecotrack_status: string | null; gift_booklet: boolean; status_before_trash: string | null; trashed_at: string | null; created_at: string; updated_at: string;
+  ecotrack_tracking: string | null; ecotrack_status: string | null; gift_booklet: boolean; shipping_provider_id: string | null; shipping_provider_name: string | null; stock_product_id: number | null; stock_product_name: string | null; ship_from_stock: boolean; status_before_trash: string | null; trashed_at: string | null; created_at: string; updated_at: string;
 };
 
-const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, gift_booklet, status_before_trash, trashed_at, created_at, updated_at`;
+const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, gift_booklet, shipping_provider_id, shipping_provider_name, stock_product_id, stock_product_name, ship_from_stock, status_before_trash, trashed_at, created_at, updated_at`;
 const ecoToOfficialWilaya: Record<number, number> = { 57: 49, 58: 50, 51: 51, 50: 52, 52: 53, 49: 54, 55: 55, 56: 56, 53: 57, 54: 58 };
 
 const ensureSchema = async () => {
@@ -44,6 +48,11 @@ const ensureSchema = async () => {
           commune VARCHAR(160),
           source_url TEXT,
           gift_booklet BOOLEAN NOT NULL DEFAULT FALSE,
+          shipping_provider_id VARCHAR(64),
+          shipping_provider_name VARCHAR(160),
+          stock_product_id BIGINT,
+          stock_product_name VARCHAR(160),
+          ship_from_stock BOOLEAN NOT NULL DEFAULT TRUE,
           ecotrack_tracking VARCHAR(120),
           ecotrack_status VARCHAR(120),
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -55,6 +64,12 @@ const ensureSchema = async () => {
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS ecotrack_tracking VARCHAR(120)`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS ecotrack_status VARCHAR(120)`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS gift_booklet BOOLEAN NOT NULL DEFAULT FALSE`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS shipping_provider_id VARCHAR(64)`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS shipping_provider_name VARCHAR(160)`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS stock_product_id BIGINT`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS stock_product_name VARCHAR(160)`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS ship_from_stock BOOLEAN NOT NULL DEFAULT TRUE`;
+      await sql!`CREATE TABLE IF NOT EXISTS atlasio_stock_products (id BIGSERIAL PRIMARY KEY, name VARCHAR(160) NOT NULL, sku VARCHAR(80), quantity INTEGER NOT NULL DEFAULT 0, active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS status_before_trash VARCHAR(24)`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS trashed_at TIMESTAMPTZ`;
       await sql!`
@@ -67,6 +82,8 @@ const ensureSchema = async () => {
       await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('ecotrack_provider', 'navexdelivery') ON CONFLICT (key) DO NOTHING`;
       await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('ecotrack_token', '') ON CONFLICT (key) DO NOTHING`;
       await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('delivery_fees', '{}') ON CONFLICT (key) DO NOTHING`;
+      await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('shipping_providers', '[]') ON CONFLICT (key) DO NOTHING`;
+      await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('active_provider_id', '') ON CONFLICT (key) DO NOTHING`;
     })();
   }
   await schemaReady;
@@ -88,17 +105,29 @@ const queryValue = (request: Request, name: string) => {
   return Array.isArray(value) ? value[0] : value;
 };
 
-const loadEcoSettings = async () => {
-  const rows = await sql!`SELECT key, value FROM atlasio_settings WHERE key IN ('ecotrack_provider', 'ecotrack_token', 'delivery_fees')` as Array<{ key: string; value: string }>;
+const loadEcoSettings = async (providerId?: string) => {
+  const rows = await sql!`SELECT key, value FROM atlasio_settings WHERE key IN ('ecotrack_provider', 'ecotrack_token', 'delivery_fees', 'shipping_providers', 'active_provider_id')` as Array<{ key: string; value: string }>;
   const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
-  let deliveryFees: Record<string, { home: number; stopDesk: number }> = {};
-  try { deliveryFees = JSON.parse(values.delivery_fees || '{}') as Record<string, { home: number; stopDesk: number }>; } catch { deliveryFees = {}; }
-  return { provider: values.ecotrack_provider || process.env.ECOTRACK_PROVIDER || 'navexdelivery', token: values.ecotrack_token || process.env.ECOTRACK_API_TOKEN || '', deliveryFees };
+  let legacyFees: Record<string, { home: number; stopDesk: number }> = {};
+  try { legacyFees = JSON.parse(values.delivery_fees || '{}') as Record<string, { home: number; stopDesk: number }>; } catch { legacyFees = {}; }
+  let providers: ShippingProvider[] = [];
+  try { providers = JSON.parse(values.shipping_providers || '[]') as ShippingProvider[]; } catch { providers = []; }
+  if (!providers.length && (values.ecotrack_provider || process.env.ECOTRACK_PROVIDER)) providers = [{ id: 'default', name: values.ecotrack_provider || 'EcoTrack', provider: values.ecotrack_provider || process.env.ECOTRACK_PROVIDER || 'navexdelivery', token: values.ecotrack_token || process.env.ECOTRACK_API_TOKEN || '', deliveryFees: legacyFees }];
+  const selected = providers.find((item) => item.id === providerId) || providers.find((item) => item.id === values.active_provider_id) || providers[0];
+  return { provider: selected?.provider || process.env.ECOTRACK_PROVIDER || 'navexdelivery', token: selected?.token || process.env.ECOTRACK_API_TOKEN || '', deliveryFees: selected?.deliveryFees || legacyFees, providerId: selected?.id || 'default', providerName: selected?.name || selected?.provider || 'EcoTrack', providers };
 };
+
+const publicProviders = (providers: ShippingProvider[]) => providers.map(({ id, name, provider, deliveryFees, token }) => ({ id, name, provider, deliveryFees, tokenConfigured: Boolean(token) }));
 
 const rowById = async (id: number) => {
   const result = await sql!`SELECT ${sql!.unsafe(selectColumns)} FROM atlasio_orders WHERE id = ${id} LIMIT 1`;
   return result[0] as OrderRow | undefined;
+};
+
+const stockById = async (id: number) => {
+  if (!Number.isInteger(id) || id <= 0) return undefined;
+  const result = await sql!`SELECT id, name, sku, quantity, active, created_at, updated_at FROM atlasio_stock_products WHERE id = ${id} AND active = TRUE LIMIT 1`;
+  return result[0] as StockProduct | undefined;
 };
 
 export default async function handler(request: Request, response: Response) {
@@ -115,7 +144,13 @@ export default async function handler(request: Request, response: Response) {
       const ecoSettings = await loadEcoSettings();
       if (resource === 'settings') {
         if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
-        response.status(200).json({ provider: ecoSettings.provider, tokenConfigured: Boolean(ecoSettings.token), deliveryFees: ecoSettings.deliveryFees });
+        response.status(200).json({ provider: ecoSettings.provider, providerName: ecoSettings.providerName, activeProviderId: ecoSettings.providerId, providers: publicProviders(ecoSettings.providers), tokenConfigured: Boolean(ecoSettings.token), deliveryFees: ecoSettings.deliveryFees });
+        return;
+      }
+      if (resource === 'stock') {
+        if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
+        const products = await sql!`SELECT id, name, sku, quantity, active, created_at, updated_at FROM atlasio_stock_products WHERE active = TRUE ORDER BY name ASC` as StockProduct[];
+        response.status(200).json({ products });
         return;
       }
       if (resource === 'fees') {
@@ -151,10 +186,14 @@ export default async function handler(request: Request, response: Response) {
       }
       if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
       if (resource === 'sync') {
-        const remote = await fetchEcoTrackOrders(ecoSettings);
-        const parcels = remote.data || [];
+        const syncProviders = ecoSettings.providers.length ? ecoSettings.providers : [ecoSettings];
         let synced = 0;
-        for (const parcel of parcels) {
+        let total = 0;
+        for (const providerConfig of syncProviders) {
+          const remote = await fetchEcoTrackOrders(providerConfig);
+          const parcels = remote.data || [];
+          total += parcels.length;
+          for (const parcel of parcels) {
           const tracking = String(parcel.tracking || parcel.tracking_number || '');
           const reference = String(parcel.reference || '');
           if (!tracking && !reference) continue;
@@ -169,9 +208,10 @@ export default async function handler(request: Request, response: Response) {
           } else {
             await sql!`UPDATE atlasio_orders SET ecotrack_tracking = COALESCE(NULLIF(${tracking}, ''), ecotrack_tracking), ecotrack_status = ${String(parcel.status || '')}, updated_at = NOW() WHERE id = ${Number(matches[0].id)}`;
           }
-          synced += 1;
+            synced += 1;
+          }
         }
-        response.status(200).json({ synced, total: parcels.length });
+        response.status(200).json({ synced, total });
         return;
       }
       const orders = await sql!`SELECT ${sql!.unsafe(selectColumns)} FROM atlasio_orders ORDER BY created_at DESC LIMIT 500`;
@@ -205,19 +245,54 @@ export default async function handler(request: Request, response: Response) {
         return;
       }
 
-      if (body.resource === 'settings') {
-        const provider = String(body.provider || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
-        const token = String(body.token || '').trim();
-        if (!provider) { response.status(400).json({ error: 'اسم الشركة مطلوب' }); return; }
-        await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('ecotrack_provider', ${provider}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
-        if (token) await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('ecotrack_token', ${token}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
-        if (body.deliveryFees && typeof body.deliveryFees === 'object') {
-          const fees = JSON.stringify(body.deliveryFees);
-          if (fees.length > 20000) { response.status(400).json({ error: 'بيانات أسعار التوصيل كبيرة جداً' }); return; }
-          await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('delivery_fees', ${fees}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+      if (body.resource === 'stock') {
+        const action = String(body.action || '');
+        const name = String(body.name || '').trim();
+        const sku = String(body.sku || '').trim() || null;
+        const quantity = Math.max(0, Math.floor(Number(body.quantity || 0)));
+        if (action === 'save') {
+          if (!name) { response.status(400).json({ error: 'اسم المنتج مطلوب' }); return; }
+          const productId = Number(body.id || 0);
+          const saved = productId > 0
+            ? await sql!`UPDATE atlasio_stock_products SET name = ${name.slice(0, 160)}, sku = ${sku}, quantity = ${quantity}, active = TRUE, updated_at = NOW() WHERE id = ${productId} RETURNING id, name, sku, quantity, active, created_at, updated_at`
+            : await sql!`INSERT INTO atlasio_stock_products (name, sku, quantity) VALUES (${name.slice(0, 160)}, ${sku}, ${quantity}) RETURNING id, name, sku, quantity, active, created_at, updated_at`;
+          response.status(200).json({ product: saved[0] }); return;
         }
-        const currentSettings = await loadEcoSettings();
-        response.status(200).json({ provider: currentSettings.provider, tokenConfigured: Boolean(currentSettings.token), deliveryFees: currentSettings.deliveryFees });
+        if (action === 'archive') {
+          const productId = Number(body.id);
+          await sql!`UPDATE atlasio_stock_products SET active = FALSE, updated_at = NOW() WHERE id = ${productId}`;
+          response.status(200).json({ message: 'تم أرشفة المنتج' }); return;
+        }
+        response.status(400).json({ error: 'إجراء المخزون غير صالح' }); return;
+      }
+
+      if (body.resource === 'settings') {
+        if (Array.isArray(body.providers)) {
+          const existingProviders = (await loadEcoSettings()).providers;
+          const providers = body.providers.map((item) => {
+            const raw = item as Record<string, unknown>;
+            const id = String(raw.id || crypto.randomUUID()).slice(0, 64);
+            const existing = existingProviders.find((saved) => saved.id === id);
+            return { id, name: String(raw.name || raw.provider || existing?.name || 'شركة توصيل').slice(0, 160), provider: String(raw.provider || existing?.provider || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, ''), token: String(raw.token || existing?.token || '').trim(), deliveryFees: raw.deliveryFees && typeof raw.deliveryFees === 'object' ? raw.deliveryFees : (existing?.deliveryFees || {}) };
+          }).filter((item) => item.provider && item.token);
+          if (providers.length > 10) { response.status(400).json({ error: 'الحد الأقصى 10 شركات توصيل' }); return; }
+          await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('shipping_providers', ${JSON.stringify(providers)}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+          const activeProviderId = String(body.activeProviderId || providers[0]?.id || '');
+          await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('active_provider_id', ${activeProviderId}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+        } else {
+          const provider = String(body.provider || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+          const token = String(body.token || '').trim();
+          if (!provider) { response.status(400).json({ error: 'اسم الشركة مطلوب' }); return; }
+          await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('ecotrack_provider', ${provider}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+          if (token) await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('ecotrack_token', ${token}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+          if (body.deliveryFees && typeof body.deliveryFees === 'object') {
+            const fees = JSON.stringify(body.deliveryFees);
+            if (fees.length > 20000) { response.status(400).json({ error: 'بيانات أسعار التوصيل كبيرة جداً' }); return; }
+            await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('delivery_fees', ${fees}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+          }
+        }
+        const currentSettings = await loadEcoSettings(String(body.activeProviderId || ''));
+        response.status(200).json({ provider: currentSettings.provider, providerName: currentSettings.providerName, activeProviderId: currentSettings.providerId, providers: publicProviders(currentSettings.providers), tokenConfigured: Boolean(currentSettings.token), deliveryFees: currentSettings.deliveryFees });
         return;
       }
 
@@ -245,8 +320,14 @@ export default async function handler(request: Request, response: Response) {
         if (!order) { response.status(404).json({ error: 'الطلب غير موجود' }); return; }
         if (order.status !== 'confirmed') { response.status(409).json({ error: 'يمكن شحن الطلبات المؤكدة فقط' }); return; }
         if (order.ecotrack_tracking) { response.status(200).json({ order, message: 'الشحنة مرفوعة مسبقاً' }); return; }
-        const tracking = await createEcoTrackParcel({ leadId: order.lead_id, price: order.price, deliveryFee: order.delivery_fee, phone: order.phone, fullName: order.full_name, wilaya: order.wilaya, commune: order.commune, deliveryType: order.delivery_type }, ecoSettings);
-        const updated = await sql!`UPDATE atlasio_orders SET status = 'shipped', ecotrack_tracking = ${tracking}, ecotrack_status = 'created', updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        const selectedProviderId = String(body.providerId || order.shipping_provider_id || ecoSettings.providerId);
+        const selectedSettings = await loadEcoSettings(selectedProviderId);
+        const selectedProduct = await stockById(Number(body.stockProductId || order.stock_product_id || 0));
+        if (!selectedProduct) { response.status(400).json({ error: 'اختر منتجاً فعالاً من المخزون قبل الشحن' }); return; }
+        if (selectedProduct.quantity < 1) { response.status(409).json({ error: 'المنتج المختار غير متوفر في المخزون' }); return; }
+        const tracking = await createEcoTrackParcel({ leadId: order.lead_id, price: order.price, deliveryFee: order.delivery_fee, phone: order.phone, fullName: order.full_name, wilaya: order.wilaya, commune: order.commune, deliveryType: order.delivery_type, giftBooklet: order.gift_booklet, productName: selectedProduct.name, shipFromStock: true }, selectedSettings);
+        await sql!`UPDATE atlasio_stock_products SET quantity = quantity - 1, updated_at = NOW() WHERE id = ${selectedProduct.id} AND quantity > 0`;
+        const updated = await sql!`UPDATE atlasio_orders SET status = 'shipped', ecotrack_tracking = ${tracking}, ecotrack_status = 'created', shipping_provider_id = ${selectedSettings.providerId}, shipping_provider_name = ${selectedSettings.providerName}, stock_product_id = ${selectedProduct.id}, stock_product_name = ${selectedProduct.name}, ship_from_stock = TRUE, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
         response.status(200).json({ order: updated[0], message: 'تم رفع الشحنة إلى EcoTrack' }); return;
       }
       if (body.action === 'unship') {
@@ -254,7 +335,7 @@ export default async function handler(request: Request, response: Response) {
         const order = await rowById(orderId);
         if (!order) { response.status(404).json({ error: 'الطلب غير موجود' }); return; }
         if (!order.ecotrack_tracking) { response.status(409).json({ error: 'الطلب غير مرفوع إلى EcoTrack' }); return; }
-        await cancelEcoTrackParcel(order.ecotrack_tracking, ecoSettings);
+        await cancelEcoTrackParcel(order.ecotrack_tracking, await loadEcoSettings(order.shipping_provider_id || ecoSettings.providerId));
         const updated = await sql!`UPDATE atlasio_orders SET status = 'confirmed', ecotrack_tracking = NULL, ecotrack_status = 'cancelled', updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
         response.status(200).json({ order: updated[0], message: 'تم إلغاء رفع الشحنة وإعادتها إلى المؤكدة' }); return;
       }
@@ -263,8 +344,12 @@ export default async function handler(request: Request, response: Response) {
         const results: Array<{ leadId: string; tracking?: string; error?: string }> = [];
         for (const order of confirmed) {
           try {
-            const tracking = await createEcoTrackParcel({ leadId: order.lead_id, price: order.price, deliveryFee: order.delivery_fee, phone: order.phone, fullName: order.full_name, wilaya: order.wilaya, commune: order.commune, deliveryType: order.delivery_type, giftBooklet: order.gift_booklet }, ecoSettings);
-            await sql!`UPDATE atlasio_orders SET status = 'shipped', ecotrack_tracking = ${tracking}, ecotrack_status = 'created', updated_at = NOW() WHERE id = ${order.id}`;
+            const selectedSettings = await loadEcoSettings(String(body.providerId || order.shipping_provider_id || ecoSettings.providerId));
+            const selectedProduct = await stockById(Number(body.stockProductId || order.stock_product_id || 0));
+            if (!selectedProduct || selectedProduct.quantity < 1) throw new Error('المنتج المختار غير متوفر في المخزون');
+            const tracking = await createEcoTrackParcel({ leadId: order.lead_id, price: order.price, deliveryFee: order.delivery_fee, phone: order.phone, fullName: order.full_name, wilaya: order.wilaya, commune: order.commune, deliveryType: order.delivery_type, giftBooklet: order.gift_booklet, productName: selectedProduct.name, shipFromStock: true }, selectedSettings);
+            await sql!`UPDATE atlasio_stock_products SET quantity = quantity - 1, updated_at = NOW() WHERE id = ${selectedProduct.id}`;
+            await sql!`UPDATE atlasio_orders SET status = 'shipped', ecotrack_tracking = ${tracking}, ecotrack_status = 'created', shipping_provider_id = ${selectedSettings.providerId}, shipping_provider_name = ${selectedSettings.providerName}, stock_product_id = ${selectedProduct.id}, stock_product_name = ${selectedProduct.name}, ship_from_stock = TRUE, updated_at = NOW() WHERE id = ${order.id}`;
             results.push({ leadId: order.lead_id, tracking });
           } catch (shipError) { results.push({ leadId: order.lead_id, error: shipError instanceof Error ? shipError.message : 'فشل الرفع' }); }
         }

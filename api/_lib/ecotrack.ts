@@ -100,6 +100,8 @@ export async function createEcoTrackParcel(order: {
   commune?: string | null;
   deliveryType?: string | null;
   giftBooklet?: boolean;
+  productName?: string | null;
+  shipFromStock?: boolean;
 }, settings?: EcoTrackSettings) {
   ensureToken(settings);
   const phone = normalizePhone(order.phone);
@@ -124,10 +126,10 @@ export async function createEcoTrackParcel(order: {
       commune: commune.name,
       code_wilaya: code,
       montant: Math.round(order.price + (order.deliveryFee || 0)),
-      produit: 'باك الربيع الملكي',
+      produit: order.productName || 'باك الربيع الملكي',
       type: 1,
       stop_desk: order.deliveryType === 'stop_desk' ? 1 : 0,
-      stock: 0,
+      stock: order.shipFromStock === false ? 0 : 1,
       remarque: `Atlasio ${order.leadId}${order.giftBooklet ? ' - كتيب عناية مجاني' : ''}`,
       poids: 1,
     }),
