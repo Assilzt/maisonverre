@@ -26,11 +26,15 @@
 
 .admin-dashboard table thead {
   background: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .admin-dashboard table tbody tr {
   border-color: #eef1f4;
   transition: background-color 150ms ease;
+  min-height: 72px;
 }
 
 .admin-dashboard table tbody tr:hover {
@@ -50,6 +54,39 @@
   border-color: #f97316;
   box-shadow: 0 0 0 3px rgb(249 115 22 / 0.12);
   outline: none;
+}
+
+.admin-dashboard table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.admin-dashboard table th {
+  height: 48px;
+  white-space: nowrap;
+  color: #64748b;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+}
+
+.admin-dashboard table td {
+  vertical-align: middle;
+}
+
+.admin-dashboard table td:last-child button {
+  min-width: 76px;
+  border-color: #dbe3ee;
+  background: #f8fafc;
+}
+
+.admin-dashboard table td:last-child button:hover {
+  border-color: #fb923c;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.admin-dashboard table tbody tr:has(+ tr.bg-slate-50\/60) {
+  background: #fffaf5;
 }
 
 @custom-variant dark (&:is(.dark *));
