@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, Check, ChevronDown, ClipboardList, Loader2, LogOut, Menu, MessageCircle, Package, Pencil, Phone, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, X } from 'lucide-react';
+import { Archive, AlertCircle, Check, CheckCircle2, ChevronDown, ClipboardList, Info, Loader2, LogOut, Menu, MessageCircle, Package, Pencil, Phone, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, X } from 'lucide-react';
 
 type OrderStatus = 'abandoned' | 'complete' | 'confirmed' | 'not_responding' | 'cancelled' | 'shipped' | 'delivered' | 'returned' | 'trashed';
 type ProviderProfile = { id: string; name: string; provider: string; token?: string; tokenConfigured?: boolean; deliveryFees?: Record<string, { home: number; stopDesk: number }> };
@@ -30,6 +30,7 @@ export default function Dashboard() {
   const [dateTo, setDateTo] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [shippingNotice, setShippingNotice] = useState<{ type: 'loading' | 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [provider, setProvider] = useState('navexdelivery');
   const [token, setToken] = useState('');
@@ -167,6 +168,8 @@ export default function Dashboard() {
 
   const runAction = async (id: number, action: 'ship' | 'unship' | 'trash' | 'restore', shippingModeOverride?: 'stock' | 'without_stock') => {
     setLoading(true); setError('');
+    const isShippingAction = action === 'ship' || action === 'unship';
+    if (isShippingAction) setShippingNotice({ type: 'loading', title: action === 'ship' ? 'جارٍ رفع الطلب' : 'جارٍ إلغاء الرفع', message: action === 'ship' ? 'يتم إرسال بيانات الطلب إلى EcoTrack، يرجى الانتظار قليلاً.' : 'يتم طلب إلغاء الشحنة من EcoTrack.' });
     try {
       const shippingMode = action === 'ship' ? (shippingModeOverride || orderShippingModes[id] || (shipFromStock ? 'stock' : 'without_stock')) : undefined;
       if (action === 'ship' && shippingMode) setOrderShippingModes((current) => ({ ...current, [id]: shippingMode }));
@@ -181,7 +184,15 @@ export default function Dashboard() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'تعذر تنفيذ العملية');
       setOrders((current) => current.map((order) => order.id === id ? data.order : order));
-    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'تعذر تنفيذ العملية'); }
+      if (isShippingAction) {
+        const tracking = data.order?.ecotrack_tracking;
+        setShippingNotice({ type: 'success', title: action === 'ship' ? 'تم شحن الطلب بنجاح' : 'تم إلغاء الرفع', message: action === 'ship' ? (tracking ? `تم قبول الطلب من EcoTrack. رقم التتبع: ${tracking}` : 'تم قبول الطلب من EcoTrack وتسجيله كمرفوع.') : 'تم إلغاء الشحنة من EcoTrack بنجاح.' });
+      }
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : 'تعذر تنفيذ العملية';
+      setError(message);
+      if (isShippingAction) setShippingNotice({ type: 'error', title: action === 'ship' ? 'تعذر شحن الطلب' : 'تعذر إلغاء الرفع', message: `${message}. لم يتم تأكيد العملية، يمكنك المحاولة مجدداً.` });
+    }
     finally { setLoading(false); }
   };
 
@@ -285,7 +296,7 @@ export default function Dashboard() {
   );
 
   return (
-    <main className="admin-dashboard min-h-screen bg-[#f4f6f5] text-slate-950" dir="rtl" onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null; }} onTouchEnd={(event) => { const start = touchStartX.current; const end = event.changedTouches[0]?.clientX; if (start !== null && end !== undefined && start - end > 70) setDrawerOpen(true); if (start !== null && end !== undefined && end - start > 70) setDrawerOpen(false); touchStartX.current = null; }}>
+    <main className="admin-dashboard min-h-screen bg-[#f4f6f5] text-slate-950" dir="rtl" onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null; }} onTouchEnd={(event) => { const start = touchStartX.current; const end = event.changedTouches[0]?.clientX; if (start !== null && end !== undefined && start - end > 70) setDrawerOpen(true); if (start !== null && end !== undefined && end - start > 70) setDrawerOpen(false); touchStartX.current = null; }}>{shippingNotice && <div className={`fixed inset-x-3 top-3 z-[90] mx-auto max-w-md rounded-2xl border p-4 shadow-2xl backdrop-blur sm:inset-x-auto sm:right-6 sm:top-6 ${shippingNotice.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : shippingNotice.type === 'error' ? 'border-rose-200 bg-rose-50 text-rose-950' : shippingNotice.type === 'loading' ? 'border-blue-200 bg-blue-50 text-blue-950' : 'border-slate-200 bg-white text-slate-950'}`} role="status"><div className="flex items-start gap-3">{shippingNotice.type === 'success' ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /> : shippingNotice.type === 'error' ? <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" /> : shippingNotice.type === 'loading' ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-blue-600" /> : <Info className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />}<div className="min-w-0 flex-1"><p className="text-sm font-black">{shippingNotice.title}</p><p className="mt-1 text-xs font-bold leading-5 opacity-80">{shippingNotice.message}</p></div><button type="button" onClick={() => setShippingNotice(null)} className="rounded-lg p-1 opacity-60 transition hover:bg-black/5 hover:opacity-100" aria-label="إغلاق الإشعار"><X className="h-4 w-4" /></button></div></div>}
       <div className="mx-auto flex min-h-screen max-w-[1500px]">
         <aside className="hidden w-[238px] shrink-0 flex-col bg-[#0d1a17] p-5 text-white lg:flex"><div className="mb-10 flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-400 font-black text-[#0d1a17]">A</div><div><p className="text-lg font-black tracking-tight">Atlasio</p><p className="text-[10px] text-emerald-200/60">OPERATIONS</p></div></div><nav className="space-y-2 text-sm font-semibold"><button type="button" onClick={() => goToSection('orders')} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === 'orders' ? 'bg-white/10 text-emerald-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><ClipboardList className="h-4 w-4" /> الطلبات <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">{counts.confirmed || 0}</span></button><button type="button" onClick={() => goToSection('incomplete')} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === 'incomplete' ? 'bg-white/10 text-amber-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><Package className="h-4 w-4" /> غير مكتملة <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">{(counts.abandoned || 0) + (counts.not_responding || 0)}</span></button><button type="button" onClick={() => goToSection('trash')} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === 'trash' ? 'bg-white/10 text-rose-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><Archive className="h-4 w-4" /> سلة المهملات <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">{counts.trashed || 0}</span></button><button type="button" onClick={() => void syncStatuses()} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-slate-400 transition hover:bg-white/5 hover:text-white"><RefreshCw className="h-4 w-4" /> مزامنة EcoTrack</button><button type="button" onClick={() => { setSettingsOpen(true); setDrawerOpen(false); }} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-slate-400 transition hover:bg-white/5 hover:text-white"><Settings className="h-4 w-4" /> الإعدادات</button></nav><div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-3 text-xs"><p className="font-bold text-emerald-300">EcoTrack</p><p className="mt-1 text-slate-400">{tokenConfigured ? 'متصل وجاهز للشحن' : 'يحتاج إعداد التوكن'}</p></div></aside>
         <section className="min-w-0 flex-1 px-4 py-4 sm:px-6 lg:px-10 lg:py-8">
