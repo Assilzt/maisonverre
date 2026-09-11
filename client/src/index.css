@@ -1,6 +1,57 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+.admin-dashboard {
+  font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.admin-dashboard .rounded-2xl {
+  border-radius: 1.25rem;
+}
+
+.admin-dashboard .rounded-xl {
+  border-radius: 0.875rem;
+}
+
+.admin-dashboard header {
+  border-color: #edf0f3;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.admin-dashboard section {
+  border-color: #edf0f3;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.admin-dashboard table thead {
+  background: #f8fafc;
+}
+
+.admin-dashboard table tbody tr {
+  border-color: #eef1f4;
+  transition: background-color 150ms ease;
+}
+
+.admin-dashboard table tbody tr:hover {
+  background: #fafafa;
+}
+
+.admin-dashboard input,
+.admin-dashboard select,
+.admin-dashboard textarea {
+  border-color: #e5e7eb;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.admin-dashboard input:focus,
+.admin-dashboard select:focus,
+.admin-dashboard textarea:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgb(249 115 22 / 0.12);
+  outline: none;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
