@@ -1,7 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import {
   cancelEcoTrackParcel,
-  createEcoTrackParcel,
+  createEcoTrackNonStockParcel,
+  createEcoTrackStockParcel,
   fetchEcoTrackCommunes,
   fetchEcoTrackFees,
   fetchEcoTrackOrders,
@@ -19,7 +20,7 @@ type Response = { status: (code: number) => Response; json: (body: unknown) => v
 
 type ShippingProvider = { id: string; name: string; provider: string; token: string; deliveryFees: Record<string, { home: number; stopDesk: number }> };
 
-type StockProduct = { id: number; name: string; sku: string | null; quantity: number; active: boolean; created_at: string; updated_at: string };
+type StockProduct = { id: number; name: string; sku: string | null; quantity: number; active: boolean; provider_product_id?: string | null; created_at: string; updated_at: string };
 
 type OrderRow = {
   id: number; lead_id: string; status: string; campaign: string; price: number; delivery_fee: number; delivery_type: string | null;
@@ -73,6 +74,8 @@ const ensureSchema = async () => {
       await sql!`CREATE TABLE IF NOT EXISTS atlasio_stock_products (id BIGSERIAL PRIMARY KEY, name VARCHAR(160) NOT NULL, sku VARCHAR(80), quantity INTEGER NOT NULL DEFAULT 0, active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS status_before_trash VARCHAR(24)`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS trashed_at TIMESTAMPTZ`;
+      await sql!`ALTER TABLE atlasio_stock_products ADD COLUMN IF NOT EXISTS provider_id VARCHAR(64)`;
+      await sql!`ALTER TABLE atlasio_stock_products ADD COLUMN IF NOT EXISTS provider_product_id VARCHAR(160)`;
       await sql!`
         CREATE TABLE IF NOT EXISTS atlasio_settings (
           key VARCHAR(64) PRIMARY KEY,
@@ -125,10 +128,40 @@ const rowById = async (id: number) => {
   return result[0] as OrderRow | undefined;
 };
 
-const stockById = async (id: number) => {
+const stockById = async (id: number, providerId: string) => {
   if (!Number.isInteger(id) || id <= 0) return undefined;
-  const result = await sql!`SELECT id, name, sku, quantity, active, created_at, updated_at FROM atlasio_stock_products WHERE id = ${id} AND active = TRUE LIMIT 1`;
+  const result = await sql!`SELECT id, name, sku, quantity, active, created_at, updated_at FROM atlasio_stock_products WHERE id = ${id} AND provider_id = ${providerId} AND active = TRUE LIMIT 1`;
   return result[0] as StockProduct | undefined;
+};
+
+const reserveStockUnit = async (productId: number) => {
+  const result = await sql!`UPDATE atlasio_stock_products SET quantity = quantity - 1, updated_at = NOW() WHERE id = ${productId} AND active = TRUE AND quantity > 0 RETURNING id`;
+  if (!result[0]) throw new Error('المنتج المختار غير متوفر في المخزون');
+};
+
+const releaseStockUnit = async (productId: number) => {
+  await sql!`UPDATE atlasio_stock_products SET quantity = quantity + 1, updated_at = NOW() WHERE id = ${productId} AND active = TRUE`;
+};
+
+const reserveStockUnits = async (productId: number, quantity: number) => {
+  let reserved = 0;
+  try {
+    for (; reserved < quantity; reserved += 1) await reserveStockUnit(productId);
+  } catch (error) {
+    for (let index = 0; index < reserved; index += 1) await releaseStockUnit(productId);
+    throw error;
+  }
+};
+
+const releaseStockUnits = async (productId: number, quantity: number) => {
+  for (let index = 0; index < quantity; index += 1) await releaseStockUnit(productId);
+};
+
+const shippingModeFromBody = (body: Record<string, unknown>): 'stock' | 'without_stock' | null => {
+  if (body.shippingMode === 'stock' || body.shippingMode === 'without_stock') return body.shippingMode;
+  if (body.shipFromStock === true) return 'stock';
+  if (body.shipFromStock === false) return 'without_stock';
+  return null;
 };
 
 export default async function handler(request: Request, response: Response) {
@@ -200,8 +233,13 @@ export default async function handler(request: Request, response: Response) {
         let synced = 0;
         let total = 0;
         for (const providerConfig of syncProviders) {
-          const remote = await fetchEcoTrackOrders(providerConfig);
-          const parcels = remote.data || [];
+          const firstPage = await fetchEcoTrackOrders(providerConfig, 1, 100);
+          const parcels = [...(firstPage.data || [])];
+          const lastPage = Math.max(1, Number(firstPage.last_page || 1));
+          for (let page = 2; page <= lastPage; page += 1) {
+            const nextPage = await fetchEcoTrackOrders(providerConfig, page, 100);
+            parcels.push(...(nextPage.data || []));
+          }
           total += parcels.length;
           for (const parcel of parcels) {
           const tracking = String(parcel.tracking || parcel.tracking_number || '');
@@ -212,7 +250,7 @@ export default async function handler(request: Request, response: Response) {
             : await sql!`SELECT id FROM atlasio_orders WHERE lead_id = ${reference} LIMIT 1`;
           if (!matches[0]) continue;
           const normalized = normalizeEcoTrackStatus(parcel.status);
-          const nextStatus = normalized === 'delivered' ? 'delivered' : normalized === 'returned' ? 'returned' : undefined;
+          const nextStatus = normalized === 'delivered' ? 'delivered' : ['returning', 'returned', 'cancelled'].includes(normalized) ? 'returned' : undefined;
           if (nextStatus) {
             await sql!`UPDATE atlasio_orders SET ecotrack_tracking = COALESCE(NULLIF(${tracking}, ''), ecotrack_tracking), ecotrack_status = ${String(parcel.status || '')}, status = CASE WHEN status = 'trashed' THEN status ELSE ${nextStatus} END, updated_at = NOW() WHERE id = ${Number(matches[0].id)}`;
           } else {
@@ -331,31 +369,42 @@ export default async function handler(request: Request, response: Response) {
         if (order.status !== 'confirmed') { response.status(409).json({ error: 'يمكن شحن الطلبات المؤكدة فقط' }); return; }
         if (order.ecotrack_tracking) { response.status(200).json({ order, message: 'الشحنة مرفوعة مسبقاً' }); return; }
 
-        const useStock = body.shipFromStock !== false;
+        const shippingMode = shippingModeFromBody(body);
+        if (!shippingMode) { response.status(400).json({ error: 'حدد طريقة الشحن: من المخزون أو بدون مخزون' }); return; }
+        const useStock = shippingMode === 'stock';
         const selectedProviderId = String(body.providerId || order.shipping_provider_id || ecoSettings.providerId);
         const selectedSettings = await loadEcoSettings(selectedProviderId);
-        const selectedProduct = useStock ? await stockById(Number(body.stockProductId || order.stock_product_id || 0)) : null;
+        const shipmentQuantity = Math.max(1, Math.floor(Number(body.quantity) || 1));
+        const selectedProduct = useStock ? await stockById(Number(body.stockProductId || order.stock_product_id || 0), selectedProviderId) : null;
 
         if (useStock && (!selectedProduct)) { response.status(400).json({ error: 'اختر منتجاً فعالاً من المخزون قبل الشحن' }); return; }
-        if (useStock && selectedProduct && selectedProduct.quantity < 1) { response.status(409).json({ error: 'المنتج المختار غير متوفر في المخزون' }); return; }
+        if (useStock && selectedProduct && selectedProduct.quantity < shipmentQuantity) { response.status(409).json({ error: 'الكمية المطلوبة غير متوفرة في المخزون' }); return; }
 
         const productName = selectedProduct?.name || 'باك الربيع الملكي';
-        const tracking = await createEcoTrackParcel({
-          leadId: order.lead_id,
-          price: order.price,
-          deliveryFee: order.delivery_fee,
-          phone: order.phone,
-          fullName: order.full_name,
-          wilaya: order.wilaya,
-          commune: order.commune,
-          deliveryType: order.delivery_type,
-          giftBooklet: order.gift_booklet,
-          productName,
-          shipFromStock: useStock,
-        }, selectedSettings);
-
+        const createParcel = useStock ? createEcoTrackStockParcel : createEcoTrackNonStockParcel;
+        let stockReserved = false;
         if (useStock && selectedProduct) {
-          await sql!`UPDATE atlasio_stock_products SET quantity = quantity - 1, updated_at = NOW() WHERE id = ${selectedProduct.id} AND quantity > 0`;
+          await reserveStockUnits(selectedProduct.id, shipmentQuantity);
+          stockReserved = true;
+        }
+        let tracking: string;
+        try {
+          tracking = await createParcel({
+            leadId: order.lead_id,
+            price: order.price,
+            deliveryFee: order.delivery_fee,
+            phone: order.phone,
+            fullName: order.full_name,
+            wilaya: order.wilaya,
+            commune: order.commune,
+            deliveryType: order.delivery_type,
+            giftBooklet: order.gift_booklet,
+            productName,
+            quantity: shipmentQuantity,
+          }, selectedSettings);
+        } catch (shipError) {
+          if (stockReserved && selectedProduct) await releaseStockUnits(selectedProduct.id, shipmentQuantity);
+          throw shipError;
         }
 
         const updated = await sql!`UPDATE atlasio_orders SET status = 'shipped', ecotrack_tracking = ${tracking}, ecotrack_status = 'created', shipping_provider_id = ${selectedSettings.providerId}, shipping_provider_name = ${selectedSettings.providerName}, stock_product_id = ${useStock && selectedProduct ? selectedProduct.id : null}, stock_product_name = ${useStock && selectedProduct ? selectedProduct.name : null}, ship_from_stock = ${useStock}, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
@@ -367,37 +416,52 @@ export default async function handler(request: Request, response: Response) {
         if (!order) { response.status(404).json({ error: 'الطلب غير موجود' }); return; }
         if (!order.ecotrack_tracking) { response.status(409).json({ error: 'الطلب غير مرفوع إلى EcoTrack' }); return; }
         await cancelEcoTrackParcel(order.ecotrack_tracking, await loadEcoSettings(order.shipping_provider_id || ecoSettings.providerId));
+        if (order.ship_from_stock && order.stock_product_id) {
+          await releaseStockUnit(order.stock_product_id);
+        }
         const updated = await sql!`UPDATE atlasio_orders SET status = 'confirmed', ecotrack_tracking = NULL, ecotrack_status = 'cancelled', updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
         response.status(200).json({ order: updated[0], message: 'تم إلغاء رفع الشحنة وإعادتها إلى المؤكدة' }); return;
       }
       if (body.action === 'shipAll') {
         const confirmed = await sql!`SELECT ${sql!.unsafe(selectColumns)} FROM atlasio_orders WHERE status = 'confirmed' AND ecotrack_tracking IS NULL ORDER BY created_at ASC` as OrderRow[];
         const results: Array<{ leadId: string; tracking?: string; error?: string }> = [];
-        const useStock = body.shipFromStock !== false;
+        const shippingMode = shippingModeFromBody(body);
+        if (!shippingMode) { response.status(400).json({ error: 'حدد طريقة الشحن: من المخزون أو بدون مخزون' }); return; }
+        const useStock = shippingMode === 'stock';
 
         for (const order of confirmed) {
           try {
             const selectedSettings = await loadEcoSettings(String(body.providerId || order.shipping_provider_id || ecoSettings.providerId));
-            const selectedProduct = useStock ? await stockById(Number(body.stockProductId || order.stock_product_id || 0)) : null;
-            if (useStock && (!selectedProduct || selectedProduct.quantity < 1)) throw new Error('المنتج المختار غير متوفر في المخزون');
+            const shipmentQuantity = Math.max(1, Math.floor(Number(body.quantity) || 1));
+            const selectedProviderId = String(body.providerId || order.shipping_provider_id || ecoSettings.providerId);
+            const selectedProduct = useStock ? await stockById(Number(body.stockProductId || order.stock_product_id || 0), selectedProviderId) : null;
+            if (useStock && (!selectedProduct || selectedProduct.quantity < shipmentQuantity)) throw new Error('الكمية المطلوبة غير متوفرة في المخزون');
 
             const productName = selectedProduct?.name || 'باك الربيع الملكي';
-            const tracking = await createEcoTrackParcel({
-              leadId: order.lead_id,
-              price: order.price,
-              deliveryFee: order.delivery_fee,
-              phone: order.phone,
-              fullName: order.full_name,
-              wilaya: order.wilaya,
-              commune: order.commune,
-              deliveryType: order.delivery_type,
-              giftBooklet: order.gift_booklet,
-              productName,
-              shipFromStock: useStock,
-            }, selectedSettings);
-
+            const createParcel = useStock ? createEcoTrackStockParcel : createEcoTrackNonStockParcel;
+            let stockReserved = false;
             if (useStock && selectedProduct) {
-              await sql!`UPDATE atlasio_stock_products SET quantity = quantity - 1, updated_at = NOW() WHERE id = ${selectedProduct.id} AND quantity > 0`;
+              await reserveStockUnits(selectedProduct.id, shipmentQuantity);
+              stockReserved = true;
+            }
+            let tracking: string;
+            try {
+              tracking = await createParcel({
+                leadId: order.lead_id,
+                price: order.price,
+                deliveryFee: order.delivery_fee,
+                phone: order.phone,
+                fullName: order.full_name,
+                wilaya: order.wilaya,
+                commune: order.commune,
+                deliveryType: order.delivery_type,
+                giftBooklet: order.gift_booklet,
+                productName,
+                quantity: shipmentQuantity,
+              }, selectedSettings);
+            } catch (shipError) {
+              if (stockReserved && selectedProduct) await releaseStockUnits(selectedProduct.id, shipmentQuantity);
+              throw shipError;
             }
 
             await sql!`UPDATE atlasio_orders SET status = 'shipped', ecotrack_tracking = ${tracking}, ecotrack_status = 'created', shipping_provider_id = ${selectedSettings.providerId}, shipping_provider_name = ${selectedSettings.providerName}, stock_product_id = ${useStock && selectedProduct ? selectedProduct.id : null}, stock_product_name = ${useStock && selectedProduct ? selectedProduct.name : null}, ship_from_stock = ${useStock}, updated_at = NOW() WHERE id = ${order.id}`;

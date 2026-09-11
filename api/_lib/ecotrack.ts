@@ -32,12 +32,39 @@ const officialToEcoTrack: Record<number, number> = {
 
 const normalizeLocationText = (value: string) => String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[إأآا]/g, 'ا').replace(/[يى]/g, 'ي').replace(/[ة]/g, 'ه').replace(/[\s_-]+/g, ' ');
 const locationAliases: Record<string, string> = {
+  'mahelma': 'maalma',
+  'ouzellaguen': 'ouzellaguene',
+  'msirda': 'msirda fouaga',
+  'ouaguenoun': 'ouaguenoune',
+  'yakouren': 'yakourene',
+  'ziama mansouriah': 'ziama mansouria',
+  'ziama': 'ziama mansouria',
+  'oued el bar': 'oued el barad',
+  'el harrouch': 'el arrouch',
+  'hamma': 'hamadi krouma',
+  'kanouar': 'kanoua',
+  'khezaras': 'khezara',
+  "hammam n'bails": "hammam n'bail",
+  'el ksir': 'ain ouksir',
+  'el meed': 'el houamed',
+  'el menaoua': 'menaa',
+  'nesmoth': 'nesmot',
+  'el abiodh sidi cheikh': 'el biodh sidi cheikh',
+  'zemmouri el bahri': 'zemmouri',
+  'grarem': 'grarem gouga',
+  'oulhaca': 'oulhaca el gheraba',
+  'el fedjoudj boughrara': 'el fedjoudj boughrara sa',
   'عين قزام': 'in guezzam',
   'إن قزام': 'in guezzam',
   'ain guezzam': 'in guezzam',
   'in guezzam': 'in guezzam',
 };
 const canonicalLocationText = (value: string) => locationAliases[normalizeLocationText(value)] || normalizeLocationText(value);
+const comparableLocationText = (value: string) => canonicalLocationText(value)
+  .replace(/['’]/g, ' ')
+  .replace(/^(les|el|al|l)\s*/i, '')
+  .replace(/[\s-]/g, '')
+  .replace(/(.)\1+/g, '$1');
 
 const wilayaCode = (value: string) => {
   const raw = String(value || '');
@@ -52,8 +79,8 @@ const wilayaCode = (value: string) => {
 const canonicalCommuneForEcoTrack = async (wilaya: string, commune: string, settings?: EcoTrackSettings) => {
   const code = wilayaCode(wilaya);
   const communes = await fetchEcoTrackCommunes(wilaya, settings);
-  const selected = canonicalLocationText(commune);
-  const match = communes.find((item) => canonicalLocationText(item.name) === selected);
+  const selected = comparableLocationText(commune);
+  const match = communes.find((item) => comparableLocationText(item.name) === selected);
   if (!match) throw new Error(`البلدية «${commune}» غير متاحة في EcoTrack لولاية ${wilaya}`);
   return { name: match.name, code, postalCode: match.codePostal };
 };
@@ -68,6 +95,8 @@ export async function fetchEcoTrackWilayas(settings?: EcoTrackSettings) {
 }
 
 export type EcoTrackProduct = { id: string; name: string; reference: string | null; quantity: number; active: boolean };
+
+export type EcoTrackShippingMode = 'stock' | 'without_stock';
 
 export async function fetchEcoTrackProducts(settings?: EcoTrackSettings) {
   ensureToken(settings);
@@ -118,7 +147,8 @@ export async function createEcoTrackParcel(order: {
   deliveryType?: string | null;
   giftBooklet?: boolean;
   productName?: string | null;
-  shipFromStock?: boolean;
+  shippingMode: EcoTrackShippingMode;
+  quantity?: number;
 }, settings?: EcoTrackSettings) {
   ensureToken(settings);
   const phone = normalizePhone(order.phone);
@@ -146,7 +176,8 @@ export async function createEcoTrackParcel(order: {
       produit: order.productName || 'باك الربيع الملكي',
       type: 1,
       stop_desk: order.deliveryType === 'stop_desk' ? 1 : 0,
-      stock: order.shipFromStock === false ? 0 : 1,
+      stock: order.shippingMode === 'stock' ? 1 : 0,
+      ...(order.shippingMode === 'stock' ? { quantite: Math.max(1, Math.floor(order.quantity || 1)) } : {}),
       remarque: `Atlasio ${order.leadId}${order.giftBooklet ? ' - كتيب عناية مجاني' : ''}`,
       poids: 1,
     }),
@@ -161,11 +192,17 @@ export async function createEcoTrackParcel(order: {
   return String(tracking);
 }
 
-export async function fetchEcoTrackOrders(settings?: EcoTrackSettings) {
+export const createEcoTrackStockParcel = (order: Omit<Parameters<typeof createEcoTrackParcel>[0], 'shippingMode'> & { quantity?: number }, settings?: EcoTrackSettings) =>
+  createEcoTrackParcel({ ...order, shippingMode: 'stock' }, settings);
+
+export const createEcoTrackNonStockParcel = (order: Omit<Parameters<typeof createEcoTrackParcel>[0], 'shippingMode'>, settings?: EcoTrackSettings) =>
+  createEcoTrackParcel({ ...order, shippingMode: 'without_stock' }, settings);
+
+export async function fetchEcoTrackOrders(settings?: EcoTrackSettings, page = 1, limit = 100) {
   ensureToken(settings);
-  const response = await fetch(`${getBaseUrl(settings)}/get/orders?page=1&limit=100`, { headers: getHeaders(settings) });
+  const response = await fetch(`${getBaseUrl(settings)}/get/orders?page=${page}&limit=${limit}`, { headers: getHeaders(settings) });
   if (!response.ok) throw new Error(`تعذر جلب حالات EcoTrack (${response.status})`);
-  return response.json() as Promise<{ data?: Array<Record<string, unknown>> }>;
+  return response.json() as Promise<{ data?: Array<Record<string, unknown>>; last_page?: number; total?: number }>;
 }
 
 export async function cancelEcoTrackParcel(tracking: string, settings?: EcoTrackSettings) {
@@ -178,9 +215,12 @@ export async function cancelEcoTrackParcel(tracking: string, settings?: EcoTrack
 
 export function normalizeEcoTrackStatus(value: unknown) {
   const status = String(value || '').toLowerCase().trim();
-  if (/retour|return|cancel|annul|echec|refus|absent/.test(status)) return 'returned';
+  if (/retour|return/.test(status)) return 'returning';
+  if (/cancel|annul/.test(status)) return 'cancelled';
+  if (/echec|refus|absent|failed/.test(status)) return 'failed_delivery';
   if (/livr|delivered|encaiss|pay/.test(status)) return 'delivered';
-  if (/cours|transit|hub|picked|ramass/.test(status)) return 'in_transit';
-  if (/pr[eê]t|ready/.test(status)) return 'ready';
+  if (/cours|transit|hub|picked|ramass|transferred|vers_/.test(status)) return 'in_transit';
+  if (/livraison|out_for/.test(status)) return 'out_for_delivery';
+  if (/pr[eê]t|ready|created|pending|re[cç]u/.test(status)) return 'ready';
   return status || 'unknown';
 }
