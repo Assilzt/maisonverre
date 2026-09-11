@@ -377,7 +377,8 @@ export default async function handler(request: Request, response: Response) {
         const shipmentQuantity = Math.max(1, Math.floor(Number(body.quantity) || 1));
         const selectedProduct = useStock ? await stockById(Number(body.stockProductId || order.stock_product_id || 0), selectedProviderId) : null;
 
-        if (useStock && (!selectedProduct)) { response.status(400).json({ error: 'اختر منتجاً فعالاً من المخزون قبل الشحن' }); return; }
+        // EcoTrack's standard API represents stock with stock=1 and quantite;
+        // it does not require a product id from a remote product catalogue.
         if (useStock && selectedProduct && selectedProduct.quantity < shipmentQuantity) { response.status(409).json({ error: 'الكمية المطلوبة غير متوفرة في المخزون' }); return; }
 
         const productName = selectedProduct?.name || 'باك الربيع الملكي';
@@ -435,7 +436,7 @@ export default async function handler(request: Request, response: Response) {
             const shipmentQuantity = Math.max(1, Math.floor(Number(body.quantity) || 1));
             const selectedProviderId = String(body.providerId || order.shipping_provider_id || ecoSettings.providerId);
             const selectedProduct = useStock ? await stockById(Number(body.stockProductId || order.stock_product_id || 0), selectedProviderId) : null;
-            if (useStock && (!selectedProduct || selectedProduct.quantity < shipmentQuantity)) throw new Error('الكمية المطلوبة غير متوفرة في المخزون');
+            if (useStock && selectedProduct && selectedProduct.quantity < shipmentQuantity) throw new Error('الكمية المطلوبة غير متوفرة في المخزون المحلي');
 
             const productName = selectedProduct?.name || 'باك الربيع الملكي';
             const createParcel = useStock ? createEcoTrackStockParcel : createEcoTrackNonStockParcel;

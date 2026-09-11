@@ -98,18 +98,33 @@ export type EcoTrackProduct = { id: string; name: string; reference: string | nu
 
 export type EcoTrackShippingMode = 'stock' | 'without_stock';
 
+const firstArray = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+  const record = value as Record<string, unknown>;
+  for (const key of ['products', 'data', 'items', 'results', 'result', 'rows']) {
+    const nested = record[key];
+    if (Array.isArray(nested)) return nested;
+    if (nested && typeof nested === 'object') {
+      const found = firstArray(nested);
+      if (found.length > 0) return found;
+    }
+  }
+  return [];
+};
+
 export async function fetchEcoTrackProducts(settings?: EcoTrackSettings) {
   ensureToken(settings);
   const response = await fetch(`${getBaseUrl(settings)}/get/products/list`, { headers: getHeaders(settings) });
   if (!response.ok) throw new Error(`تعذر جلب منتجات المخزون (${response.status})`);
   const data = await response.json() as unknown;
-  const items = Array.isArray(data) ? data : ((data as { products?: unknown[]; data?: unknown[] })?.products || (data as { data?: unknown[] })?.data || []);
+  const items = firstArray(data);
   return (items as Array<Record<string, unknown>>).map((item) => ({
-    id: String(item.id ?? item.product_id ?? item.reference ?? item.ref ?? ''),
-    name: String(item.name ?? item.nom ?? item.product_name ?? item.produit ?? ''),
-    reference: item.reference ?? item.ref ?? item.sku ? String(item.reference ?? item.ref ?? item.sku) : null,
-    quantity: Math.max(0, Number(item.quantity ?? item.stock ?? item.qty ?? 0) || 0),
-    active: item.active !== false && item.is_active !== false,
+    id: String(item.id ?? item.product_id ?? item.productId ?? item.code ?? item.reference ?? item.ref ?? ''),
+    name: String(item.name ?? item.nom ?? item.product_name ?? item.productName ?? item.produit ?? item.title ?? ''),
+    reference: item.reference ?? item.ref ?? item.sku ?? item.product_reference ? String(item.reference ?? item.ref ?? item.sku ?? item.product_reference) : null,
+    quantity: Math.max(0, Number(item.quantity ?? item.quantite ?? item.stock ?? item.qty ?? item.available_quantity ?? item.available ?? 0) || 0),
+    active: item.active !== false && item.is_active !== false && item.status !== false && item.deleted !== true,
   })).filter((item) => item.id && item.name && item.active);
 }
 
