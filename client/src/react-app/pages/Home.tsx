@@ -77,8 +77,6 @@ const WILAYA_COMMUNES: Record<string, string[]> = {
 
 const PHONE_PATTERN = /^(0\d{9}|\+213\d{9})$/;
 
-const TELEGRAM_BOT_TOKEN = '8028024261:AAGqUaxed7tsD7PoMb1gQ9QPeVp6tGC8JlQ';
-const TELEGRAM_CHAT_ID = '-1003776870179';
 
 const validatePhone = (value: string): string => {
   const trimmedValue = value.trim();
@@ -475,15 +473,12 @@ export default function Home() {
     });
     const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee || 'يحدد بعد اختيار الولاية'} دج\n📞 الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
 
-    void fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    void fetch('/api/telegram', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
-        text: leadMessage,
-      }),
+      body: JSON.stringify({ action: 'send', text: leadMessage }),
     })
       .then(async (response) => {
         const data = await response.json().catch(() => null);
@@ -533,28 +528,21 @@ export default function Home() {
       let responseOk = false;
 
       if (leadMessageId) {
-        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
+        const response = await fetch('/api/telegram', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            chat_id: TELEGRAM_CHAT_ID,
-            message_id: Number(leadMessageId),
-            text: message,
-          }),
+          body: JSON.stringify({ action: 'edit', messageId: Number(leadMessageId), text: message }),
         });
         responseOk = response.ok;
       } else {
-        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        const response = await fetch('/api/telegram', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            chat_id: TELEGRAM_CHAT_ID,
-            text: message,
-          }),
+          body: JSON.stringify({ action: 'send', text: message }),
         });
         responseOk = response.ok;
       }
