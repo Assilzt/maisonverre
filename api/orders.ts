@@ -26,9 +26,10 @@ type OrderRow = {
   id: number; lead_id: string; status: string; campaign: string; price: number; delivery_fee: number; delivery_type: string | null;
   phone: string; full_name: string | null; wilaya: string | null; commune: string | null; source_url: string | null;
   ecotrack_tracking: string | null; ecotrack_status: string | null; gift_booklet: boolean; shipping_provider_id: string | null; shipping_provider_name: string | null; stock_product_id: number | null; stock_product_name: string | null; ship_from_stock: boolean; status_before_trash: string | null; trashed_at: string | null; created_at: string; updated_at: string;
+  confirmation_status: string; contact_result: string; contact_attempts: number; last_contacted_at: string | null; follow_up_at: string | null; shipment_status: string; payment_status: string;
 };
 
-const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, gift_booklet, shipping_provider_id, shipping_provider_name, stock_product_id, stock_product_name, ship_from_stock, status_before_trash, trashed_at, created_at, updated_at`;
+const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, gift_booklet, shipping_provider_id, shipping_provider_name, stock_product_id, stock_product_name, ship_from_stock, status_before_trash, trashed_at, confirmation_status, contact_result, contact_attempts, last_contacted_at, follow_up_at, shipment_status, payment_status, created_at, updated_at`;
 const ecoToOfficialWilaya: Record<number, number> = { 57: 49, 58: 50, 51: 51, 50: 52, 52: 53, 49: 54, 55: 55, 56: 56, 53: 57, 54: 58 };
 
 const ensureSchema = async () => {
@@ -74,6 +75,15 @@ const ensureSchema = async () => {
       await sql!`CREATE TABLE IF NOT EXISTS atlasio_stock_products (id BIGSERIAL PRIMARY KEY, name VARCHAR(160) NOT NULL, sku VARCHAR(80), quantity INTEGER NOT NULL DEFAULT 0, active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS status_before_trash VARCHAR(24)`;
       await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS trashed_at TIMESTAMPTZ`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS confirmation_status VARCHAR(32) NOT NULL DEFAULT 'pending'`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS contact_result VARCHAR(32) NOT NULL DEFAULT 'not_contacted'`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS contact_attempts INTEGER NOT NULL DEFAULT 0`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS last_contacted_at TIMESTAMPTZ`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS follow_up_at TIMESTAMPTZ`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS shipment_status VARCHAR(32) NOT NULL DEFAULT 'not_ready'`;
+      await sql!`ALTER TABLE atlasio_orders ADD COLUMN IF NOT EXISTS payment_status VARCHAR(32) NOT NULL DEFAULT 'cash_on_delivery'`;
+      await sql!`CREATE TABLE IF NOT EXISTS atlasio_order_events (id BIGSERIAL PRIMARY KEY, order_id BIGINT NOT NULL, event_type VARCHAR(64) NOT NULL, from_value VARCHAR(64), to_value VARCHAR(64), message TEXT NOT NULL, metadata JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
+      await sql!`CREATE INDEX IF NOT EXISTS atlasio_order_events_order_id_idx ON atlasio_order_events (order_id, created_at DESC)`;
       await sql!`ALTER TABLE atlasio_stock_products ADD COLUMN IF NOT EXISTS provider_id VARCHAR(64)`;
       await sql!`ALTER TABLE atlasio_stock_products ADD COLUMN IF NOT EXISTS provider_product_id VARCHAR(160)`;
       await sql!`
@@ -157,6 +167,14 @@ const releaseStockUnits = async (productId: number, quantity: number) => {
   for (let index = 0; index < quantity; index += 1) await releaseStockUnit(productId);
 };
 
+const recordEvent = async (orderId: number, eventType: string, message: string, fromValue?: string | null, toValue?: string | null, metadata: Record<string, unknown> = {}) => {
+  try {
+    await sql!`INSERT INTO atlasio_order_events (order_id, event_type, from_value, to_value, message, metadata) VALUES (${orderId}, ${eventType.slice(0, 64)}, ${fromValue || null}, ${toValue || null}, ${message.slice(0, 1000)}, ${JSON.stringify(metadata)})`;
+  } catch (error) {
+    console.error('Atlasio order event error', error instanceof Error ? error.message : 'unknown');
+  }
+};
+
 const shippingModeFromBody = (body: Record<string, unknown>): 'stock' | 'without_stock' | null => {
   if (body.shippingMode === 'stock' || body.shippingMode === 'without_stock') return body.shippingMode;
   if (body.shipFromStock === true) return 'stock';
@@ -227,6 +245,13 @@ export default async function handler(request: Request, response: Response) {
         response.status(200).json({ communes: await fetchEcoTrackCommunes(wilaya, ecoSettings) });
         return;
       }
+      if (resource === 'events') {
+        if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
+        const orderId = Number(queryValue(request, 'orderId'));
+        if (!Number.isInteger(orderId) || orderId <= 0) { response.status(400).json({ error: 'رقم الطلب غير صالح' }); return; }
+        const events = await sql!`SELECT id, order_id, event_type, from_value, to_value, message, metadata, created_at FROM atlasio_order_events WHERE order_id = ${orderId} ORDER BY created_at DESC LIMIT 100`;
+        response.status(200).json({ events }); return;
+      }
       if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
       if (resource === 'sync') {
         const syncProviders = ecoSettings.providers.length ? ecoSettings.providers : [ecoSettings];
@@ -272,6 +297,21 @@ export default async function handler(request: Request, response: Response) {
     if (request.method === 'PATCH') {
       if (!isAdmin(request)) { response.status(401).json({ error: 'غير مصرح' }); return; }
 
+      if (body.action === 'contact') {
+        const orderId = Number(body.id);
+        const order = await rowById(orderId);
+        if (!order) { response.status(404).json({ error: 'الطلب غير موجود' }); return; }
+        const result = String(body.result || 'contacted').slice(0, 32);
+        const allowedResults = ['contacted', 'confirmed', 'no_answer', 'busy', 'call_later', 'wrong_number', 'refused'];
+        if (!allowedResults.includes(result)) { response.status(400).json({ error: 'نتيجة الاتصال غير صالحة' }); return; }
+        const nextConfirmation = result === 'confirmed' ? 'confirmed' : result === 'refused' || result === 'wrong_number' ? 'cancelled' : 'pending';
+        const nextOrderStatus = result === 'confirmed' ? 'confirmed' : result === 'refused' || result === 'wrong_number' ? 'cancelled' : order.status;
+        const updated = await sql!`UPDATE atlasio_orders SET confirmation_status = ${nextConfirmation}, contact_result = ${result}, contact_attempts = contact_attempts + 1, last_contacted_at = NOW(), status = ${nextOrderStatus}, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        await recordEvent(orderId, 'contact_result', `نتيجة الاتصال: ${result}`, order.confirmation_status, nextConfirmation, { result });
+        if (result === 'confirmed') await recordEvent(orderId, 'order_confirmed', 'تم تأكيد الطلب وتجهيزه للشحن', order.status, 'confirmed');
+        response.status(200).json({ order: updated[0], message: result === 'confirmed' ? 'تم تأكيد الطلب وتجهيزه للشحن' : 'تم تسجيل نتيجة الاتصال' }); return;
+      }
+
       if (body.action === 'edit') {
         const orderId = Number(body.id);
         const order = await rowById(orderId);
@@ -289,6 +329,7 @@ export default async function handler(request: Request, response: Response) {
         if (!Number.isFinite(price) || price < 0 || !Number.isFinite(deliveryFee) || deliveryFee < 0) { response.status(400).json({ error: 'سعر المنتج وسعر التوصيل يجب أن يكونا أرقاماً صحيحة أو صفراً' }); return; }
         const deliveryType = body.deliveryType ? String(body.deliveryType).slice(0, 24) : order.delivery_type;
         const updated = await sql!`UPDATE atlasio_orders SET price = ${Math.round(price)}, phone = ${phone}, full_name = ${fullName || null}, wilaya = ${wilaya}, commune = ${commune}, delivery_fee = ${Math.round(deliveryFee)}, delivery_type = ${deliveryType}, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        await recordEvent(orderId, 'order_updated', 'تم تعديل بيانات الطلب');
         response.status(200).json({ order: updated[0], message: 'تم تعديل بيانات الطلب' });
         return;
       }
@@ -351,6 +392,7 @@ export default async function handler(request: Request, response: Response) {
         if (!order) { response.status(404).json({ error: 'الطلب غير موجود' }); return; }
         if (order.status === 'trashed') { response.status(200).json({ order, message: 'الطلب موجود مسبقاً في سلة المهملات' }); return; }
         const updated = await sql!`UPDATE atlasio_orders SET status = 'trashed', status_before_trash = ${order.status}, trashed_at = NOW(), updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        await recordEvent(orderId, 'order_trashed', 'تم نقل الطلب إلى سلة المهملات', order.status, 'trashed');
         response.status(200).json({ order: updated[0], message: 'تم نقل الطلب إلى سلة المهملات' }); return;
       }
       if (body.action === 'restore') {
@@ -360,6 +402,7 @@ export default async function handler(request: Request, response: Response) {
         if (order.status !== 'trashed') { response.status(409).json({ error: 'الطلب ليس في سلة المهملات' }); return; }
         const restoredStatus = ['abandoned', 'complete', 'confirmed', 'not_responding', 'cancelled', 'shipped', 'delivered', 'returned'].includes(order.status_before_trash || '') ? order.status_before_trash : 'abandoned';
         const updated = await sql!`UPDATE atlasio_orders SET status = ${restoredStatus}, status_before_trash = NULL, trashed_at = NULL, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        await recordEvent(orderId, 'order_restored', 'تم استرجاع الطلب من سلة المهملات', 'trashed', restoredStatus);
         response.status(200).json({ order: updated[0], message: 'تم استرجاع الطلب من سلة المهملات' }); return;
       }
       if (body.action === 'ship') {
@@ -408,8 +451,9 @@ export default async function handler(request: Request, response: Response) {
           throw shipError;
         }
 
-        const updated = await sql!`UPDATE atlasio_orders SET status = 'shipped', ecotrack_tracking = ${tracking}, ecotrack_status = 'created', shipping_provider_id = ${selectedSettings.providerId}, shipping_provider_name = ${selectedSettings.providerName}, stock_product_id = ${useStock && selectedProduct ? selectedProduct.id : null}, stock_product_name = ${useStock && selectedProduct ? selectedProduct.name : null}, ship_from_stock = ${useStock}, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
-        response.status(200).json({ order: updated[0], message: 'تم رفع الشحنة إلى EcoTrack' }); return;
+        const updated = await sql!`UPDATE atlasio_orders SET status = 'shipped', shipment_status = 'shipped', ecotrack_tracking = ${tracking}, ecotrack_status = 'created', shipping_provider_id = ${selectedSettings.providerId}, shipping_provider_name = ${selectedSettings.providerName}, stock_product_id = ${useStock && selectedProduct ? selectedProduct.id : null}, stock_product_name = ${useStock && selectedProduct ? selectedProduct.name : null}, ship_from_stock = ${useStock}, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        await recordEvent(orderId, 'shipment_succeeded', `تم قبول الشحنة من ${selectedSettings.providerName} برقم تتبع ${tracking}`, 'shipping', 'shipped', { tracking, providerId: selectedSettings.providerId });
+        response.status(200).json({ order: updated[0], message: 'تم رفع الشحنة إلى EcoTrack', tracking }); return;
       }
       if (body.action === 'unship') {
         const orderId = Number(body.id);
@@ -420,7 +464,8 @@ export default async function handler(request: Request, response: Response) {
         if (order.ship_from_stock && order.stock_product_id) {
           await releaseStockUnit(order.stock_product_id);
         }
-        const updated = await sql!`UPDATE atlasio_orders SET status = 'confirmed', ecotrack_tracking = NULL, ecotrack_status = 'cancelled', updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        const updated = await sql!`UPDATE atlasio_orders SET status = 'confirmed', shipment_status = 'cancelled', ecotrack_tracking = NULL, ecotrack_status = 'cancelled', updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        await recordEvent(orderId, 'shipment_cancelled', 'تم إلغاء رفع الشحنة وإعادتها إلى المؤكدة', 'shipped', 'cancelled');
         response.status(200).json({ order: updated[0], message: 'تم إلغاء رفع الشحنة وإعادتها إلى المؤكدة' }); return;
       }
       if (body.action === 'shipAll') {
@@ -504,6 +549,7 @@ export default async function handler(request: Request, response: Response) {
         ON CONFLICT (lead_id) DO UPDATE SET status = EXCLUDED.status, campaign = EXCLUDED.campaign, price = EXCLUDED.price, delivery_fee = EXCLUDED.delivery_fee, delivery_type = EXCLUDED.delivery_type, phone = EXCLUDED.phone, full_name = EXCLUDED.full_name, wilaya = EXCLUDED.wilaya, commune = EXCLUDED.commune, source_url = EXCLUDED.source_url, gift_booklet = EXCLUDED.gift_booklet, updated_at = NOW()
         RETURNING ${sql!.unsafe(selectColumns)}
       `;
+      await recordEvent(Number(saved[0].id), 'order_created', 'تم إنشاء الطلب من صفحة الهبوط', null, status, { campaign, sourceUrl });
       response.status(200).json({ order: saved[0] });
       return;
     }
