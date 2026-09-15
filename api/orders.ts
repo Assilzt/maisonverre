@@ -411,6 +411,8 @@ export default async function handler(request: Request, response: Response) {
         if (!order) { response.status(404).json({ error: 'الطلب غير موجود' }); return; }
         if (order.status !== 'confirmed') { response.status(409).json({ error: 'يمكن شحن الطلبات المؤكدة فقط' }); return; }
         if (order.ecotrack_tracking) { response.status(200).json({ order, message: 'الشحنة مرفوعة مسبقاً' }); return; }
+        const claim = await sql!`UPDATE atlasio_orders SET shipment_status = 'processing', updated_at = NOW() WHERE id = ${orderId} AND status = 'confirmed' AND ecotrack_tracking IS NULL AND COALESCE(shipment_status, '') <> 'processing' RETURNING id`;
+        if (!claim[0]) { response.status(409).json({ error: 'الشحنة قيد المعالجة أو تم رفعها مسبقاً، انتظر النتيجة قبل إعادة المحاولة' }); return; }
 
         const shippingMode = shippingModeFromBody(body);
         if (!shippingMode) { response.status(400).json({ error: 'حدد طريقة الشحن: من المخزون أو بدون مخزون' }); return; }
@@ -448,6 +450,7 @@ export default async function handler(request: Request, response: Response) {
           }, selectedSettings);
         } catch (shipError) {
           if (stockReserved && selectedProduct) await releaseStockUnits(selectedProduct.id, shipmentQuantity);
+          await sql!`UPDATE atlasio_orders SET shipment_status = 'failed', updated_at = NOW() WHERE id = ${orderId} AND ecotrack_tracking IS NULL`;
           throw shipError;
         }
 
