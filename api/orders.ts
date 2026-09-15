@@ -281,7 +281,7 @@ export default async function handler(request: Request, response: Response) {
             if (!matches[0]) continue;
             providerMatched += 1;
             const normalized = normalizeEcoTrackStatus(parcel.status);
-          const nextStatus = normalized === 'delivered' ? 'delivered' : ['returning', 'returned', 'cancelled'].includes(normalized) ? 'returned' : undefined;
+            const nextStatus = normalized === 'delivered' ? 'delivered' : ['returning', 'returned'].includes(normalized) ? 'returned' : normalized === 'cancelled' ? 'cancelled' : undefined;
           if (nextStatus) {
             await sql!`UPDATE atlasio_orders SET ecotrack_tracking = COALESCE(NULLIF(${tracking}, ''), ecotrack_tracking), ecotrack_status = ${String(parcel.status || '')}, status = CASE WHEN status = 'trashed' THEN status ELSE ${nextStatus} END, updated_at = NOW() WHERE id = ${Number(matches[0].id)}`;
           } else {
