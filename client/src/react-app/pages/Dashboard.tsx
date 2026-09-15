@@ -227,9 +227,12 @@ export default function Dashboard() {
     setSyncing(true); setError('');
     try {
       const response = await fetch('/api/orders?resource=sync', { headers: authHeaders() });
-      const data = await response.json().catch(() => ({}));
+      const data = await response.json().catch(() => ({})) as { error?: string; synced?: number; matched?: number; total?: number; providers?: Array<{ provider: string; error?: string }> };
       if (!response.ok) throw new Error(data.error || 'تعذرت مزامنة EcoTrack');
       await loadOrders();
+      const providerError = data.providers?.find((item) => item.error)?.error;
+      if (providerError) throw new Error(providerError);
+      setShippingNotice({ type: 'success', title: 'تمت مزامنة EcoTrack', message: `تم فحص ${data.total || 0} شحنة، وتحديث ${data.synced || 0} طلبية (${data.matched || 0} مطابقة).` });
     } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'تعذرت مزامنة EcoTrack'); }
     finally { setSyncing(false); }
   };

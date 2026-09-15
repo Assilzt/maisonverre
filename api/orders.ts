@@ -256,25 +256,31 @@ export default async function handler(request: Request, response: Response) {
       if (resource === 'sync') {
         const syncProviders = ecoSettings.providers.length ? ecoSettings.providers : [ecoSettings];
         let synced = 0;
+        let matched = 0;
         let total = 0;
+        const providerResults: Array<{ provider: string; fetched: number; matched: number; synced: number; error?: string }> = [];
         for (const providerConfig of syncProviders) {
-          const firstPage = await fetchEcoTrackOrders(providerConfig, 1, 100);
-          const parcels = [...(firstPage.data || [])];
-          const lastPage = Math.max(1, Number(firstPage.last_page || 1));
-          for (let page = 2; page <= lastPage; page += 1) {
-            const nextPage = await fetchEcoTrackOrders(providerConfig, page, 100);
-            parcels.push(...(nextPage.data || []));
-          }
-          total += parcels.length;
-          for (const parcel of parcels) {
-          const tracking = String(parcel.tracking || parcel.tracking_number || '');
-          const reference = String(parcel.reference || '');
-          if (!tracking && !reference) continue;
-          const matches = tracking
-            ? await sql!`SELECT id FROM atlasio_orders WHERE ecotrack_tracking = ${tracking} OR lead_id = ${reference} LIMIT 1`
-            : await sql!`SELECT id FROM atlasio_orders WHERE lead_id = ${reference} LIMIT 1`;
-          if (!matches[0]) continue;
-          const normalized = normalizeEcoTrackStatus(parcel.status);
+          try {
+            const firstPage = await fetchEcoTrackOrders(providerConfig, 1, 100);
+            const parcels = [...(firstPage.data || [])];
+            const lastPage = Math.max(1, Number(firstPage.last_page || 1));
+            for (let page = 2; page <= lastPage; page += 1) {
+              const nextPage = await fetchEcoTrackOrders(providerConfig, page, 100);
+              parcels.push(...(nextPage.data || []));
+            }
+            let providerMatched = 0;
+            let providerSynced = 0;
+            total += parcels.length;
+            for (const parcel of parcels) {
+            const tracking = String(parcel.tracking || parcel.tracking_number || '');
+            const reference = String(parcel.reference || '');
+            if (!tracking && !reference) continue;
+            const matches = tracking
+              ? await sql!`SELECT id FROM atlasio_orders WHERE ecotrack_tracking = ${tracking} OR lead_id = ${reference} LIMIT 1`
+              : await sql!`SELECT id FROM atlasio_orders WHERE lead_id = ${reference} LIMIT 1`;
+            if (!matches[0]) continue;
+            providerMatched += 1;
+            const normalized = normalizeEcoTrackStatus(parcel.status);
           const nextStatus = normalized === 'delivered' ? 'delivered' : ['returning', 'returned', 'cancelled'].includes(normalized) ? 'returned' : undefined;
           if (nextStatus) {
             await sql!`UPDATE atlasio_orders SET ecotrack_tracking = COALESCE(NULLIF(${tracking}, ''), ecotrack_tracking), ecotrack_status = ${String(parcel.status || '')}, status = CASE WHEN status = 'trashed' THEN status ELSE ${nextStatus} END, updated_at = NOW() WHERE id = ${Number(matches[0].id)}`;
@@ -282,9 +288,15 @@ export default async function handler(request: Request, response: Response) {
             await sql!`UPDATE atlasio_orders SET ecotrack_tracking = COALESCE(NULLIF(${tracking}, ''), ecotrack_tracking), ecotrack_status = ${String(parcel.status || '')}, updated_at = NOW() WHERE id = ${Number(matches[0].id)}`;
           }
             synced += 1;
+            providerSynced += 1;
+            }
+            matched += providerMatched;
+            providerResults.push({ provider: providerConfig.provider || 'EcoTrack', fetched: parcels.length, matched: providerMatched, synced: providerSynced });
+          } catch (providerError) {
+            providerResults.push({ provider: providerConfig.provider || 'EcoTrack', fetched: 0, matched: 0, synced: 0, error: providerError instanceof Error ? providerError.message : 'فشل الاتصال بـEcoTrack' });
           }
         }
-        response.status(200).json({ synced, total });
+        response.status(200).json({ synced, matched, total, providers: providerResults });
         return;
       }
       const orders = await sql!`SELECT ${sql!.unsafe(selectColumns)} FROM atlasio_orders ORDER BY created_at DESC LIMIT 500`;

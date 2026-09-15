@@ -217,7 +217,15 @@ export async function fetchEcoTrackOrders(settings?: EcoTrackSettings, page = 1,
   ensureToken(settings);
   const response = await fetch(`${getBaseUrl(settings)}/get/orders?page=${page}&limit=${limit}`, { headers: getHeaders(settings) });
   if (!response.ok) throw new Error(`تعذر جلب حالات EcoTrack (${response.status})`);
-  return response.json() as Promise<{ data?: Array<Record<string, unknown>>; last_page?: number; total?: number }>;
+  const payload = await response.json() as Record<string, unknown>;
+  const nested = payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data) ? payload.data as Record<string, unknown> : null;
+  const data = Array.isArray(payload.data) ? payload.data : Array.isArray(nested?.data) ? nested.data : Array.isArray(payload.orders) ? payload.orders : [];
+  const meta = payload.meta && typeof payload.meta === 'object' ? payload.meta as Record<string, unknown> : null;
+  return {
+    data: data as Array<Record<string, unknown>>,
+    last_page: Number(payload.last_page ?? nested?.last_page ?? meta?.last_page ?? 1) || 1,
+    total: Number(payload.total ?? nested?.total ?? meta?.total ?? data.length) || data.length,
+  };
 }
 
 export async function cancelEcoTrackParcel(tracking: string, settings?: EcoTrackSettings) {
