@@ -4,6 +4,19 @@ import { Input } from '@/react-app/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/react-app/components/ui/select';
 import { Label } from '@/react-app/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import {
+  DEFAULT_PRODUCT,
+  ProductLandingConfig,
+  formatCountdown,
+  getOfferEndsAt,
+  getPixelStorageKey,
+  getProductCampaignLabel,
+  getProductEventData,
+  getProductLeadId,
+  getProductLeadMessageStorageKey,
+  getProductLeadStorageKey,
+  getProductOfferPrice,
+} from '@/react-app/product-config';
 
 const WILAYAS = [
   '01 - أدرار', '02 - الشلف', '03 - الأغواط', '04 - أم البواقي', '05 - باتنة', '06 - بجاية', '07 - بسكرة', '08 - بشار', '09 - البليدة', '10 - البويرة',
@@ -92,76 +105,6 @@ const validatePhone = (value: string): string => {
   return '';
 };
 
-const DEFAULT_PRICE = 1900;
-const SPECIAL_PRICE = 2700;
-const LIMITED_OFFER_DURATION_MS = 10 * 60 * 1000;
-const isLimitedOffer = new URLSearchParams(window.location.search).get('offer') === 'limited';
-const LIMITED_OFFER_STORAGE_KEY = 'atlasio-limited-offer-ends-at';
-const GIFT_OFFER_DURATION_MS = 5 * 60 * 1000;
-const GIFT_OFFER_STORAGE_KEY = 'atlasio-booklet-gift-ends-at';
-
-const getOfferPrice = () => {
-  const requestedPrice = new URLSearchParams(window.location.search).get('price');
-  if (isLimitedOffer) return DEFAULT_PRICE;
-  return requestedPrice === String(SPECIAL_PRICE) ? SPECIAL_PRICE : DEFAULT_PRICE;
-};
-
-const getLimitedOfferEndsAt = () => {
-  if (!isLimitedOffer) return null;
-  const storedEndsAt = Number(window.localStorage.getItem(LIMITED_OFFER_STORAGE_KEY));
-  if (storedEndsAt > 0) return storedEndsAt;
-  const endsAt = Date.now() + LIMITED_OFFER_DURATION_MS;
-  window.localStorage.setItem(LIMITED_OFFER_STORAGE_KEY, String(endsAt));
-  return endsAt;
-};
-
-const getGiftOfferEndsAt = () => {
-  const storedEndsAt = Number(window.localStorage.getItem(GIFT_OFFER_STORAGE_KEY));
-  if (storedEndsAt > 0) return storedEndsAt;
-  const endsAt = Date.now() + GIFT_OFFER_DURATION_MS;
-  window.localStorage.setItem(GIFT_OFFER_STORAGE_KEY, String(endsAt));
-  return endsAt;
-};
-
-const formatCountdown = (milliseconds: number) => {
-  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  return `${minutes}:${seconds}`;
-};
-
-const getCampaignLabel = (price: number) => {
-  if (isLimitedOffer && price === DEFAULT_PRICE) return 'عرض محدود';
-  if (price === SPECIAL_PRICE) return 'السعر العادي';
-  return 'الرابط الأساسي';
-};
-
-const getLeadStorageKey = (phone: string) => `atlasio:telegram-lead:${phone}`;
-const getLeadMessageStorageKey = (phone: string) => `atlasio:telegram-message:${phone}`;
-
-const getLeadId = (phone: string) => {
-  const storageKey = `atlasio:lead-id:${phone}`;
-
-  try {
-    const existingId = window.sessionStorage.getItem(storageKey);
-    if (existingId) return existingId;
-
-    const leadId = `AT-${Date.now().toString(36).toUpperCase()}`;
-    window.sessionStorage.setItem(storageKey, leadId);
-    return leadId;
-  } catch {
-    return `AT-${Date.now().toString(36).toUpperCase()}`;
-  }
-};
-
-const getProductEventData = (price: number): Record<string, unknown> => ({
-  content_name: 'باك الربيع الملكي',
-  content_ids: ['atlasio-spring-pack'],
-  content_type: 'product',
-  value: price,
-  currency: 'DZD',
-});
-
 const saveOrder = async (payload: {
   leadId: string;
   status: 'abandoned' | 'complete';
@@ -179,10 +122,7 @@ const saveOrder = async (payload: {
     await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...payload,
-        sourceUrl: window.location.href,
-      }),
+      body: JSON.stringify({ ...payload, sourceUrl: window.location.href }),
     });
   } catch {
     // Telegram remains the immediate fallback alert if the database is unavailable.
@@ -191,85 +131,49 @@ const saveOrder = async (payload: {
 
 const fireFacebookEvent = (eventName: string, parameters: Record<string, unknown> = {}) => {
   const fbq = (window as Window & { fbq?: (...args: unknown[]) => void }).fbq;
-
-  if (typeof fbq === 'function') {
-    fbq('track', eventName, parameters);
-  }
+  if (typeof fbq === 'function') fbq('track', eventName, parameters);
 };
 
 const fireFacebookEventOnce = (
+  product: ProductLandingConfig,
   eventName: string,
   dedupeKey: string,
   parameters: Record<string, unknown> = {},
 ) => {
-  const storageKey = `atlasio:pixel:${dedupeKey}`;
-
+  const storageKey = getPixelStorageKey(product, dedupeKey);
   try {
-    if (window.sessionStorage.getItem(storageKey)) {
-      return;
-    }
-
+    if (window.sessionStorage.getItem(storageKey)) return;
     window.sessionStorage.setItem(storageKey, '1');
   } catch {
     // Tracking must never block the order flow if storage is unavailable.
   }
-
   fireFacebookEvent(eventName, parameters);
 };
 
-const IMAGE_SLIDES = [
-  { src: '/images/main-pack.webp', alt: 'باك الربيع الملكي مع أربعة أنواع من الزهور', label: 'الباك الرئيسي' },
-  { src: '/images/proof-seedling.webp', alt: 'شتلات صغيرة نامية في أصيص', label: 'بداية النمو' },
-] as const;
-
-const FLOWER_TYPES = [
-  { name: 'زينيا قزم F1', emoji: '🌼', accent: 'bg-rose-100 text-rose-700', seeds: 'حوالي 15 بذرة', area: 'حتى 1 م²' },
-  { name: 'مارغريت', emoji: '🌻', accent: 'bg-amber-100 text-amber-700', seeds: 'حوالي 1900 بذرة', area: 'حتى 2 م²' },
-  { name: 'كوزموس', emoji: '🌸', accent: 'bg-pink-100 text-pink-700', seeds: 'حوالي 200 بذرة', area: 'حتى 6 م²' },
-  { name: 'قتيفة (كوليوس)', emoji: '🌿', accent: 'bg-emerald-100 text-emerald-700', seeds: 'حوالي 680 بذرة', area: 'حتى 3 م²' },
-] as const;
-
-function ImageSlider({ compact = false }: { compact?: boolean }) {
+function ImageSlider({ images, compact = false }: { images: ProductLandingConfig['images']; compact?: boolean }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const activeSlide = IMAGE_SLIDES[activeIndex];
+  const activeSlide = images[activeIndex];
 
   useEffect(() => {
     if (isPaused) return;
     const intervalId = window.setInterval(() => {
-      setActiveIndex((currentIndex) => (currentIndex + 1) % IMAGE_SLIDES.length);
+      setActiveIndex((currentIndex) => (currentIndex + 1) % images.length);
     }, 5000);
     return () => window.clearInterval(intervalId);
-  }, [isPaused]);
+  }, [images.length, isPaused]);
 
   return (
-    <div
-      className={`group relative overflow-hidden rounded-2xl bg-white shadow-2xl ${compact ? '' : 'w-full max-w-lg'}`}
-      role="region"
-      aria-label="صور المنتج ونتائج الزراعة"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-      onFocus={() => setIsPaused(true)}
-      onBlur={() => setIsPaused(false)}
-    >
-      <img
-        src={activeSlide.src}
-        alt={activeSlide.alt}
-        className={`w-full object-cover ${compact ? 'aspect-[4/3]' : 'aspect-square'}`}
-        loading={activeIndex === 0 ? 'eager' : 'lazy'}
-      />
-      <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
-        <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white" dir="rtl">{activeSlide.label}</span>
-        <span className="rounded-full bg-black/60 px-3 py-1 text-xs text-white" dir="ltr">{activeIndex + 1} / {IMAGE_SLIDES.length}</span>
+    <div className={`relative overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl ${compact ? 'w-full' : 'w-full max-w-xl'}`} onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}>
+      <img src={activeSlide.src} alt={activeSlide.alt} className="aspect-[4/3] w-full object-cover" />
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-12 text-white" dir="rtl">
+        <span className="text-sm font-bold">{activeSlide.label}</span>
+        <span className="rounded-full bg-black/60 px-3 py-1 text-xs" dir="ltr">{activeIndex + 1} / {images.length}</span>
       </div>
-      <button type="button" onClick={() => setActiveIndex((activeIndex - 1 + IMAGE_SLIDES.length) % IMAGE_SLIDES.length)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg" aria-label="الصورة السابقة">
-        <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-      </button>
-      <button type="button" onClick={() => setActiveIndex((activeIndex + 1) % IMAGE_SLIDES.length)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg" aria-label="الصورة التالية">
-        <ChevronRight className="h-5 w-5" aria-hidden="true" />
-      </button>
+      <button type="button" onClick={() => setActiveIndex((activeIndex - 1 + images.length) % images.length)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg" aria-label="الصورة السابقة"><ChevronLeft className="h-5 w-5" /></button>
+      <button type="button" onClick={() => setActiveIndex((activeIndex + 1) % images.length)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg" aria-label="الصورة التالية"><ChevronRight className="h-5 w-5" /></button>
       <div className="absolute inset-x-0 bottom-0 flex justify-center gap-2 bg-gradient-to-t from-black/60 to-transparent px-4 pb-3 pt-8" role="tablist" aria-label="اختيار صورة">
-        {IMAGE_SLIDES.map((slide, index) => (
+        {images.map((slide, index) => (
           <button key={slide.src} type="button" role="tab" aria-selected={activeIndex === index} aria-label={`عرض ${slide.label}`} onClick={() => setActiveIndex(index)} className={`h-2.5 rounded-full transition-all ${activeIndex === index ? 'w-7 bg-white' : 'w-2.5 bg-white/60 hover:bg-white'}`} />
         ))}
       </div>
@@ -277,7 +181,8 @@ function ImageSlider({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export default function Home() {
+
+export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductLandingConfig }) {
   const [fullName, setFullName] = useState('');
   const [wilaya, setWilaya] = useState('');
   const [commune, setCommune] = useState('');
@@ -287,8 +192,10 @@ export default function Home() {
   const [deliveryType, setDeliveryType] = useState<'home' | 'stop_desk'>('home');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [limitedOfferEndsAt] = useState(getLimitedOfferEndsAt);
-  const [giftOfferEndsAt] = useState(getGiftOfferEndsAt);
+  const searchParams = new URLSearchParams(window.location.search);
+  const isLimitedOffer = product.limitedOffer?.enabled === true && searchParams.get('offer') === 'limited';
+  const [limitedOfferEndsAt] = useState(() => getOfferEndsAt(product, 'limited', isLimitedOffer));
+  const [giftOfferEndsAt] = useState(() => getOfferEndsAt(product, 'gift', product.gift?.enabled === true));
   const [giftBookletSelected, setGiftBookletSelected] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
@@ -296,9 +203,9 @@ export default function Home() {
   const userInteractedRef = useRef(false);
   const facebookLeadSentRef = useRef(false);
   const limitedOfferActive = Boolean(limitedOfferEndsAt && currentTime < limitedOfferEndsAt);
-  const giftOfferActive = currentTime < giftOfferEndsAt;
-  const offerPrice = isLimitedOffer && !limitedOfferActive ? SPECIAL_PRICE : getOfferPrice();
-  const productEventData = getProductEventData(offerPrice);
+  const giftOfferActive = Boolean(giftOfferEndsAt && currentTime < giftOfferEndsAt);
+  const offerPrice = isLimitedOffer && !limitedOfferActive ? product.compareAtPrice || product.price : getProductOfferPrice(product, searchParams, isLimitedOffer);
+  const productEventData = getProductEventData(product, offerPrice);
   const initiateCheckoutSentRef = useRef(false);
 
   const phoneError = phone ? validatePhone(phone) : '';
@@ -392,7 +299,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    fireFacebookEventOnce('ViewContent', `view-content:${offerPrice}`, productEventData);
+    fireFacebookEventOnce(product, 'ViewContent', `view-content:${offerPrice}`, productEventData);
   }, []);
 
   const trackInitiateCheckout = () => {
@@ -406,7 +313,7 @@ export default function Home() {
     }
 
     initiateCheckoutSentRef.current = true;
-    fireFacebookEventOnce('InitiateCheckout', `initiate-checkout:${offerPrice}:${phone.trim() || 'no-phone'}`, {
+    fireFacebookEventOnce(product, 'InitiateCheckout', `initiate-checkout:${offerPrice}:${phone.trim() || 'no-phone'}`, {
       ...productEventData,
       lead_source: phone.trim() ? 'form_started' : 'form_engaged',
     });
@@ -429,7 +336,7 @@ export default function Home() {
 
     if (PHONE_PATTERN.test(trimmedPhone) && !facebookLeadSentRef.current && !submitted) {
       facebookLeadSentRef.current = true;
-      fireFacebookEventOnce('Lead', `lead:${trimmedPhone}`, {
+      fireFacebookEventOnce(product, 'Lead', `lead:${trimmedPhone}`, {
         ...productEventData,
         lead_source: 'valid_phone',
       });
@@ -447,7 +354,7 @@ export default function Home() {
       return;
     }
 
-    const leadStorageKey = getLeadStorageKey(trimmedPhone);
+    const leadStorageKey = getProductLeadStorageKey(product, trimmedPhone);
 
     try {
       if (window.sessionStorage.getItem(leadStorageKey)) {
@@ -460,18 +367,18 @@ export default function Home() {
       // Continue without deduplication if browser storage is unavailable.
     }
 
-    const leadId = getLeadId(trimmedPhone);
+    const leadId = getProductLeadId(product, trimmedPhone);
     void saveOrder({
       leadId,
       status: 'abandoned',
       price: offerPrice,
-      campaign: getCampaignLabel(offerPrice),
+      campaign: getProductCampaignLabel(product, offerPrice, isLimitedOffer),
       phone: trimmedPhone,
       deliveryFee,
       deliveryType,
       giftBooklet: giftBookletSelected && giftOfferActive,
     });
-    const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee || 'يحدد بعد اختيار الولاية'} دج\n📞 الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
+    const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getProductCampaignLabel(product, offerPrice, isLimitedOffer)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee || 'يحدد بعد اختيار الولاية'} دج\n📞 الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
 
     void fetch('/api/telegram', {
       method: 'POST',
@@ -485,7 +392,7 @@ export default function Home() {
         const messageId = data?.result?.message_id;
         if (response.ok && messageId) {
           try {
-            window.sessionStorage.setItem(getLeadMessageStorageKey(trimmedPhone), String(messageId));
+            window.sessionStorage.setItem(getProductLeadMessageStorageKey(product, trimmedPhone), String(messageId));
           } catch {
             // Telegram delivery should never block the lead flow.
           }
@@ -507,13 +414,13 @@ export default function Home() {
     setIsSubmitting(true);
 
     const trimmedPhone = phone.trim();
-    const leadId = getLeadId(trimmedPhone);
-    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getCampaignLabel(offerPrice)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
+    const leadId = getProductLeadId(product, trimmedPhone);
+    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getProductCampaignLabel(product, offerPrice, isLimitedOffer)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
     await saveOrder({
       leadId,
       status: 'complete',
       price: offerPrice,
-      campaign: getCampaignLabel(offerPrice),
+      campaign: getProductCampaignLabel(product, offerPrice, isLimitedOffer),
       phone: trimmedPhone,
       fullName,
       wilaya,
@@ -524,7 +431,7 @@ export default function Home() {
     });
 
     try {
-      const leadMessageId = window.sessionStorage.getItem(getLeadMessageStorageKey(trimmedPhone));
+      const leadMessageId = window.sessionStorage.getItem(getProductLeadMessageStorageKey(product, trimmedPhone));
       let responseOk = false;
 
       if (leadMessageId) {
@@ -548,15 +455,15 @@ export default function Home() {
       }
 
       if (responseOk) {
-        fireFacebookEventOnce('Purchase', `purchase:${offerPrice}:${trimmedPhone}`, productEventData);
+        fireFacebookEventOnce(product, 'Purchase', `purchase:${offerPrice}:${trimmedPhone}`, productEventData);
         setSubmitted(true);
         setFullName('');
         setWilaya('');
         setCommune('');
         setPhone('');
         facebookLeadSentRef.current = false;
-        window.sessionStorage.removeItem(getLeadStorageKey(trimmedPhone));
-        window.sessionStorage.removeItem(getLeadMessageStorageKey(trimmedPhone));
+        window.sessionStorage.removeItem(getProductLeadStorageKey(product, trimmedPhone));
+        window.sessionStorage.removeItem(getProductLeadMessageStorageKey(product, trimmedPhone));
       } else {
         alert('حدث خطأ. يرجى المحاولة مرة أخرى.');
       }
@@ -577,31 +484,31 @@ export default function Home() {
         <div className="grid md:grid-cols-2 gap-8 items-start">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100">
             <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-gray-800" dir="rtl">
-              باك واحد، 4 أنواع زهور، وبداية سهلة لشرفة أجمل 🌸
+              {product.headline} 🌸
             </h1>
             <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm" dir="rtl">
-              <p className="text-base font-extrabold text-emerald-800">🌸 تكفي لتزيين حتى 9 متر مربع من حديقتك</p>
+              <p className="text-base font-extrabold text-emerald-800">🌸 {product.subheadline}</p>
             </div>
 
             <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
-              تخيل غير كي يزهر البالكون تاعك… علاش تخليه فارغ؟ اختَر موقعك، ونتصل بك قبل الشحن لتأكيد الطلب.
+              {product.description}
             </p>
 
             {isLimitedOffer && (
               <div className={`mb-5 rounded-xl border p-3 text-center ${limitedOfferActive ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`} dir="rtl">
                 {limitedOfferActive ? (
                   <>
-                    <p className="text-sm font-bold text-amber-800">عرض خاص لزوار الصفحة: 1900 دج بدل 2700 دج</p>
+                    <p className="text-sm font-bold text-amber-800">عرض خاص لزوار الصفحة: {product.price} {product.currency} بدل {product.compareAtPrice || product.price} {product.currency}</p>
                     <p className="mt-1 text-xs text-amber-700">ينتهي السعر المخفض خلال <span className="font-bold tabular-nums">{formatCountdown(limitedOfferEndsAt! - currentTime)}</span></p>
                   </>
                 ) : (
-                  <p className="text-sm font-semibold text-gray-700">انتهى العرض الخاص — السعر الحالي: 2700 دج</p>
+                  <p className="text-sm font-semibold text-gray-700">انتهى العرض الخاص — السعر الحالي: {product.compareAtPrice || product.price} {product.currency}</p>
                 )}
               </div>
             )}
 
             <div className="md:hidden mb-6 w-full">
-              <ImageSlider compact />
+              <ImageSlider images={product.images} compact />
             </div>
 
             {submitted ? (
@@ -693,12 +600,12 @@ export default function Home() {
 
                 <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
                   <p className="text-base font-semibold text-gray-800">
-                    سعر الباك: <span className="text-xl font-extrabold text-emerald-700">{offerPrice} دج</span>
+                    سعر المنتج: <span className="text-xl font-extrabold text-emerald-700">{offerPrice} {product.currency}</span>
                   </p>
-                  {offerPrice < SPECIAL_PRICE && (
+                  {product.compareAtPrice && offerPrice < product.compareAtPrice && (
                     <p className="mt-1 text-xs font-semibold text-gray-500">
-                      <span className="line-through">2700 دج</span>
-                      <span className="mx-2 rounded-full bg-rose-100 px-2 py-1 text-rose-700">خصم {Math.round(((SPECIAL_PRICE - offerPrice) / SPECIAL_PRICE) * 100)}%</span>
+                      <span className="line-through">{product.compareAtPrice} {product.currency}</span>
+                      <span className="mx-2 rounded-full bg-rose-100 px-2 py-1 text-rose-700">خصم {Math.round((((product.compareAtPrice || product.price) - offerPrice) / (product.compareAtPrice || product.price)) * 100)}%</span>
                     </p>
                   )}
                 </div>
@@ -707,28 +614,21 @@ export default function Home() {
                   <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2" dir="rtl">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-right">
-                        <p className="text-xs font-bold text-amber-900">🎁 دليل العناية بالزهور مجاناً</p>
-                        <p className="text-[11px] text-amber-800">قيمته 300 دج · يساعدك تنجح في الزراعة</p>
+                        <p className="text-xs font-bold text-amber-900">🎁 {product.gift?.title}</p>
+                        <p className="text-[11px] text-amber-800">{product.gift?.valueLabel} · {product.gift?.description}</p>
                       </div>
                       <button type="button" onClick={() => setGiftBookletSelected((value) => !value)} className={`min-w-[145px] rounded-lg px-4 py-2.5 text-sm font-extrabold transition shadow-sm ${giftBookletSelected ? 'bg-emerald-600 text-white ring-2 ring-emerald-200' : 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600 hover:shadow-md'}`}>{giftBookletSelected ? 'تمت الإضافة ✓' : 'أضفه مجاناً لطلبي'}</button>
                     </div>
-                    <p className="mt-1 text-[10px] text-amber-700">متوفر مجاناً لمدة {formatCountdown(giftOfferEndsAt - currentTime)}</p>
+                    <p className="mt-1 text-[10px] text-amber-700">متوفر مجاناً لمدة {formatCountdown(giftOfferEndsAt! - currentTime)}</p>
                   </div>
                 )}
 
                 <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4" dir="rtl">
-                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-2 py-2">
-                    <p className="text-[11px] font-bold text-emerald-800">الدفع عند الاستلام</p>
-                  </div>
-                  <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-2 py-2">
-                    <p className="text-[11px] font-bold text-blue-800">نتصل قبل الشحن</p>
-                  </div>
-                  <div className="rounded-lg border border-pink-100 bg-pink-50/70 px-2 py-2">
-                    <p className="text-[11px] font-bold text-pink-800">4 أنواع متنوعة</p>
-                  </div>
-                  <div className="rounded-lg border border-amber-100 bg-amber-50/70 px-2 py-2">
-                    <p className="text-[11px] font-bold text-amber-800">+100 طلبية بلا شكوى</p>
-                  </div>
+                  {product.trustBadges.map((badge, index) => (
+                    <div key={`${badge}-${index}`} className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-2 py-2">
+                      <p className="text-[11px] font-bold text-emerald-800">{badge}</p>
+                    </div>
+                  ))}
                 </div>
 
                 {wilaya && (
@@ -768,26 +668,26 @@ export default function Home() {
 
                 <div className="mt-4 overflow-hidden rounded-2xl border border-pink-200 bg-gradient-to-br from-white via-pink-50/70 to-emerald-50/80 p-4 shadow-sm" dir="rtl">
                   <div className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm">
-                    <p className="text-[15px] font-bold text-emerald-800">🌸 تكفي لتزيين حتى 9 متر مربع من حديقتك</p>
+                    <p className="text-[15px] font-bold text-emerald-800">🌸 {product.resultTitle}</p>
                   </div>
 
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold tracking-wide text-pink-600">محتوى الباك</p>
-                      <p className="text-sm font-semibold text-gray-800">4 أنواع زهور متنوعة</p>
+                      <p className="text-sm font-semibold text-gray-800">{product.features.length} أنواع متنوعة</p>
                     </div>
                     <span className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-gray-600 shadow-sm">أعداد تقريبية</span>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {FLOWER_TYPES.map((flower) => (
+                    {product.features.map((flower) => (
                       <div key={flower.name} className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/80 p-2.5 shadow-sm">
                         <div className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl shadow-inner ${flower.accent}`} aria-hidden="true">
                           {flower.emoji}
                         </div>
                         <div className="min-w-0 flex-1 text-right">
                           <p className="text-sm font-extrabold text-gray-900">{flower.name}</p>
-                          <p className="mt-0.5 text-[11px] text-gray-600">{flower.seeds} · {flower.area}</p>
+                          <p className="mt-0.5 text-[11px] text-gray-600">{flower.details} · {flower.area}</p>
                         </div>
                       </div>
                     ))}
@@ -805,17 +705,17 @@ export default function Home() {
           </div>
 
           <div className="hidden md:flex justify-center items-start sticky top-8">
-            <ImageSlider />
+            <ImageSlider images={product.images} />
           </div>
         </div>
 
         <section className="mt-8 rounded-2xl bg-white/90 p-5 shadow-lg md:p-6" dir="rtl">
           <div className="flex flex-col gap-3 text-center sm:flex-row sm:items-center sm:justify-between sm:text-right">
             <div>
-              <p className="text-sm font-semibold text-pink-600">نتائج تختلف حسب العناية</p>
-              <h2 className="mt-1 text-xl font-bold text-gray-800">بداية بسيطة، فرق واضح في شرفتك</h2>
+              <p className="text-sm font-semibold text-pink-600">{product.resultEyebrow}</p>
+              <h2 className="mt-1 text-xl font-bold text-gray-800">{product.resultTitle}</h2>
             </div>
-            <p className="text-sm leading-6 text-gray-600">الزينيا والكوسموس والقتيفة محبة للدفء، والنتائج تختلف حسب النوع والموسم والعناية.</p>
+            <p className="text-sm leading-6 text-gray-600">{product.resultDescription}</p>
           </div>
         </section>
       </div>
