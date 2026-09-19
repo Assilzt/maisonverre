@@ -1,7 +1,6 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
 import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/react-app/components/ui/select';
 import { Label } from '@/react-app/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import {
@@ -575,26 +574,31 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="wilaya" className="text-base font-bold text-gray-800">الولاية</Label>
-                      <Select value={wilaya} onValueChange={(value) => setWilaya(value)}>
-                        <SelectTrigger id="wilaya" className="h-12 border-2 border-amber-200 bg-amber-50/40 px-4 text-right text-base font-medium shadow-sm focus:ring-4 focus:ring-amber-100" dir="rtl">
-                          <SelectValue placeholder="اختر الولاية" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {WILAYAS.map((w) => (
-                            <SelectItem key={w} value={w} className="text-right">
-                              {w}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <select
+                        id="wilaya"
+                        value={wilaya}
+                        onChange={(event) => setWilaya(event.target.value)}
+                        className="h-12 w-full rounded-4xl border-2 border-amber-200 bg-amber-50/40 px-4 text-right text-base font-medium shadow-sm outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                        dir="rtl"
+                      >
+                        <option value="">اختر الولاية</option>
+                        {WILAYAS.map((w) => <option key={w} value={w}>{w}</option>)}
+                      </select>
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="commune" className="text-base font-bold text-gray-800">البلدية</Label>
-                      <Select value={commune} onValueChange={(value) => { setCommune(value); const selected = communes.find((item) => item.name === value); if (selected && !selected.hasStopDesk) setDeliveryType('home'); }} disabled={!wilaya || communes.length === 0}>
-                        <SelectTrigger id="commune" className="h-12 border-2 border-amber-200 bg-amber-50/40 px-4 text-right text-base font-medium shadow-sm focus:ring-4 focus:ring-amber-100 disabled:cursor-not-allowed disabled:opacity-70" dir="rtl"><SelectValue placeholder={!wilaya ? 'اختر الولاية أولاً' : communes.length ? 'اختر البلدية من القائمة' : 'جاري تحميل بلديات EcoTrack...'} /></SelectTrigger>
-                        <SelectContent>{communes.map((item) => <SelectItem key={item.name} value={item.name} className="text-right">{item.name}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <select
+                        id="commune"
+                        value={commune}
+                        onChange={(event) => { const value = event.target.value; setCommune(value); const selected = communes.find((item) => item.name === value); if (selected && !selected.hasStopDesk) setDeliveryType('home'); }}
+                        disabled={!wilaya || communes.length === 0}
+                        className="h-12 w-full rounded-4xl border-2 border-amber-200 bg-amber-50/40 px-4 text-right text-base font-medium shadow-sm outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100 disabled:cursor-not-allowed disabled:opacity-70"
+                        dir="rtl"
+                      >
+                        <option value="">{!wilaya ? 'اختر الولاية أولاً' : communes.length ? 'اختر البلدية من القائمة' : 'جاري تحميل بلديات EcoTrack...'}</option>
+                        {communes.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+                      </select>
                     </div>
                   </div>
 
