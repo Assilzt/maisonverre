@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { Archive, AlertCircle, Check, Play, CheckCircle2, ChevronDown, ClipboardList, FileDown, Info, Loader2, LogOut, Menu, MessageCircle, Package, Pencil, Phone, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, X } from 'lucide-react';
 
 type OrderStatus = 'abandoned' | 'complete' | 'confirmed' | 'not_responding' | 'cancelled' | 'shipped' | 'delivered' | 'returned' | 'trashed';
@@ -340,7 +342,7 @@ export default function Dashboard() {
     finally { setBulkBusy(false); }
   };
 
-  const exportSelectedOrdersPdf = () => {
+  const exportSelectedOrdersPdf = async () => {
     const selectedOrders = selectedIds.map((id) => orders.find((order) => order.id === id)).filter((order): order is Order => Boolean(order));
     if (!selectedOrders.length) return;
     const totalValue = selectedOrders.reduce((sum, order) => sum + order.price + (order.delivery_fee || 0), 0);
@@ -358,13 +360,39 @@ export default function Dashboard() {
         <div class="amounts"><span>سعر المنتج: <strong>${escapeHtml(order.price)} دج</strong></span><span>التوصيل: <strong>${escapeHtml(order.delivery_fee || 0)} دج</strong></span><span class="total">الإجمالي: <strong>${escapeHtml(order.price + (order.delivery_fee || 0))} دج</strong></span></div>
         <div class="meta"><span>الدفع: ${escapeHtml(order.payment_status || 'عند الاستلام')}</span><span>التأكيد: ${escapeHtml(order.confirmation_status || '—')}</span><span>${order.gift_booklet ? 'مرفق دليل العناية' : 'بدون هدية'}</span></div>
       </article>`).join('');
-    const reportWindow = window.open('', '_blank', 'noopener,noreferrer');
-    if (!reportWindow) { setError('تعذر فتح تقرير PDF؛ اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى'); return; }
-    reportWindow.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير الطلبيات المحددة</title><style>
-      @page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;background:#f4f7f5;color:#13211d;font-family:Arial,"Tahoma",sans-serif;font-size:12px;line-height:1.65}.report{max-width:820px;margin:0 auto}.header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #0f766e;padding-bottom:14px;margin-bottom:18px}.brand{font-size:24px;font-weight:800;color:#0f766e}.subtitle{color:#64748b;margin-top:2px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}.summary div{background:#fff;border:1px solid #dce8e3;border-radius:10px;padding:10px}.summary b{display:block;color:#64748b;font-size:10px}.summary strong{display:block;margin-top:3px;font-size:17px}.order-card{background:#fff;border:1px solid #dce8e3;border-radius:12px;padding:14px;margin-bottom:12px;break-inside:avoid;box-shadow:0 2px 8px rgba(15,118,110,.05)}.order-heading{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #e8efec;padding-bottom:8px;margin-bottom:10px}.order-heading h2{font-size:16px;margin:0}.order-heading p{margin:2px 0 0;color:#64748b;font-size:10px}.status{background:#dcfce7;color:#166534;border-radius:999px;padding:3px 9px;font-weight:700;font-size:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.grid div{background:#f8faf9;border-radius:8px;padding:7px 9px}.grid b{display:block;color:#64748b;font-size:10px}.grid span{display:block;font-weight:700;margin-top:2px}.amounts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding-top:9px;border-top:1px dashed #cbd5e1}.amounts span{color:#475569}.amounts strong{color:#0f172a}.amounts .total{color:#0f766e;margin-right:auto;font-weight:800}.meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;color:#64748b;font-size:10px}.meta span{background:#f1f5f9;border-radius:999px;padding:2px 7px}.footer{color:#94a3b8;text-align:center;margin-top:16px;font-size:10px}@media print{body{background:#fff}.order-card{box-shadow:none}}
-    </style></head><body><main class="report"><header class="header"><div><div class="brand">Atlasio</div><div class="subtitle">تقرير الطلبيات المحددة</div></div><div class="subtitle">${escapeHtml(new Intl.DateTimeFormat('ar-DZ', { dateStyle: 'medium' }).format(new Date()))}</div></header><section class="summary"><div><b>عدد الطلبيات</b><strong>${selectedOrders.length}</strong></div><div><b>قيمة المنتجات والتوصيل</b><strong>${totalValue} دج</strong></div><div><b>الطلبات المحددة من اللوحة</b><strong>تقرير داخلي</strong></div></section>${reportRows}<p class="footer">تم إنشاء هذا التقرير من لوحة Atlasio — ${escapeHtml(new Date().toLocaleString('ar-DZ'))}</p></main><script>window.onload=function(){window.focus();window.print();}</script></body></html>`);
-    reportWindow.document.close();
-    setShippingNotice({ type: 'info', title: 'تم تجهيز تقرير PDF', message: 'من نافذة الطباعة اختر «Save as PDF / حفظ كـ PDF» لحفظ الملف.' });
+    const reportStyles = `@page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;background:#f4f7f5;color:#13211d;font-family:Arial,"Tahoma",sans-serif;font-size:12px;line-height:1.65}.report{width:794px;margin:0 auto;background:#fff;padding:30px}.header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #0f766e;padding-bottom:14px;margin-bottom:18px}.brand{font-size:24px;font-weight:800;color:#0f766e}.subtitle{color:#64748b;margin-top:2px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}.summary div{background:#fff;border:1px solid #dce8e3;border-radius:10px;padding:10px}.summary b{display:block;color:#64748b;font-size:10px}.summary strong{display:block;margin-top:3px;font-size:17px}.order-card{background:#fff;border:1px solid #dce8e3;border-radius:12px;padding:14px;margin-bottom:12px;break-inside:avoid;box-shadow:0 2px 8px rgba(15,118,110,.05)}.order-heading{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #e8efec;padding-bottom:8px;margin-bottom:10px}.order-heading h2{font-size:16px;margin:0}.order-heading p{margin:2px 0 0;color:#64748b;font-size:10px}.status{background:#dcfce7;color:#166534;border-radius:999px;padding:3px 9px;font-weight:700;font-size:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.grid div{background:#f8faf9;border-radius:8px;padding:7px 9px}.grid b{display:block;color:#64748b;font-size:10px}.grid span{display:block;font-weight:700;margin-top:2px}.amounts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding-top:9px;border-top:1px dashed #cbd5e1}.amounts span{color:#475569}.amounts strong{color:#0f172a}.amounts .total{color:#0f766e;margin-right:auto;font-weight:800}.meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;color:#64748b;font-size:10px}.meta span{background:#f1f5f9;border-radius:999px;padding:2px 7px}.footer{color:#94a3b8;text-align:center;margin-top:16px;font-size:10px}`;
+    const reportContainer = document.createElement('div');
+    reportContainer.dir = 'rtl';
+    reportContainer.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1;';
+    reportContainer.innerHTML = `<style>${reportStyles}</style><main class="report"><header class="header"><div><div class="brand">Atlasio</div><div class="subtitle">تقرير الطلبيات المحددة</div></div><div class="subtitle">${escapeHtml(new Intl.DateTimeFormat('ar-DZ', { dateStyle: 'medium' }).format(new Date()))}</div></header><section class="summary"><div><b>عدد الطلبيات</b><strong>${selectedOrders.length}</strong></div><div><b>قيمة المنتجات والتوصيل</b><strong>${totalValue} دج</strong></div><div><b>الطلبات المحددة من اللوحة</b><strong>تقرير داخلي</strong></div></section>${reportRows}<p class="footer">تم إنشاء هذا التقرير من لوحة Atlasio — ${escapeHtml(new Date().toLocaleString('ar-DZ'))}</p></main>`;
+    document.body.appendChild(reportContainer);
+    try {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const canvas = await html2canvas(reportContainer, { backgroundColor: '#ffffff', scale: 2, width: 794, windowWidth: 794 });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const margin = 8;
+      const pageHeight = 297 - margin * 2;
+      const imageWidth = 210 - margin * 2;
+      const imageHeight = (canvas.height * imageWidth) / canvas.width;
+      const image = canvas.toDataURL('image/jpeg', 0.94);
+      let remainingHeight = imageHeight;
+      let position = margin;
+      pdf.addImage(image, 'JPEG', margin, position, imageWidth, imageHeight);
+      remainingHeight -= pageHeight;
+      while (remainingHeight > 0) {
+        position = margin - (imageHeight - remainingHeight);
+        pdf.addPage();
+        pdf.addImage(image, 'JPEG', margin, position, imageWidth, imageHeight);
+        remainingHeight -= pageHeight;
+      }
+      pdf.save(`atlasio-orders-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setShippingNotice({ type: 'success', title: 'تم تحميل تقرير PDF', message: `تم تصدير ${selectedOrders.length} طلبية بنجاح.` });
+    } catch (exportError) {
+      console.error('PDF export error', exportError);
+      setError('تعذر إنشاء ملف PDF؛ حاول مرة أخرى أو اسمح بالتنزيلات من المتصفح');
+    } finally {
+      reportContainer.remove();
+    }
   };
 
   if (!password) return (
