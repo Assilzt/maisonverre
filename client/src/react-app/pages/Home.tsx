@@ -116,15 +116,16 @@ const saveOrder = async (payload: {
   deliveryFee?: number;
   deliveryType?: 'home' | 'stop_desk';
   giftBooklet?: boolean;
-}) => {
+}): Promise<boolean> => {
   try {
-    await fetch('/api/orders', {
+    const response = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...payload, sourceUrl: window.location.href }),
     });
+    return response.ok;
   } catch {
-    // Telegram remains the immediate fallback alert if the database is unavailable.
+    return false;
   }
 };
 
@@ -415,7 +416,7 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
     const trimmedPhone = phone.trim();
     const leadId = getProductLeadId(product, trimmedPhone);
     const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getProductCampaignLabel(product, offerPrice, isLimitedOffer)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
-    await saveOrder({
+    const orderSaved = await saveOrder({
       leadId,
       status: 'complete',
       price: offerPrice,
@@ -428,6 +429,20 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
       deliveryType,
       giftBooklet: giftBookletSelected && giftOfferActive,
     });
+
+    if (orderSaved) {
+      fireFacebookEventOnce(product, 'Purchase', `purchase:${offerPrice}:${trimmedPhone}`, productEventData);
+      setSubmitted(true);
+      setFullName('');
+      setWilaya('');
+      setCommune('');
+      setPhone('');
+      facebookLeadSentRef.current = false;
+    } else {
+      alert('تعذر تسجيل الطلب، يرجى المحاولة مرة أخرى.');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const leadMessageId = window.sessionStorage.getItem(getProductLeadMessageStorageKey(product, trimmedPhone));
@@ -454,20 +469,11 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
       }
 
       if (responseOk) {
-        fireFacebookEventOnce(product, 'Purchase', `purchase:${offerPrice}:${trimmedPhone}`, productEventData);
-        setSubmitted(true);
-        setFullName('');
-        setWilaya('');
-        setCommune('');
-        setPhone('');
-        facebookLeadSentRef.current = false;
         window.sessionStorage.removeItem(getProductLeadStorageKey(product, trimmedPhone));
         window.sessionStorage.removeItem(getProductLeadMessageStorageKey(product, trimmedPhone));
-      } else {
-        alert('حدث خطأ. يرجى المحاولة مرة أخرى.');
       }
     } catch (error) {
-      alert('حدث خطأ. يرجى المحاولة مرة أخرى.');
+      console.warn('Telegram notification failed after order save', error);
     } finally {
       setIsSubmitting(false);
     }
