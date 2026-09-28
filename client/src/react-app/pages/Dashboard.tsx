@@ -273,7 +273,6 @@ export default function Dashboard() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [editing, setEditing] = useState<Order | null>(null);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeOrderId, setActiveOrderId] = useState<number | null>(null);
   const [orderEvents, setOrderEvents] = useState<OrderEvent[]>([]);
@@ -982,14 +981,6 @@ export default function Dashboard() {
           : value === "confirmed"
             ? "border-teal-300"
             : "border-slate-300";
-  const ecoTone = (order: Order) =>
-    order.ecotrack_tracking
-      ? order.status === "delivered"
-        ? "bg-violet-50 text-violet-700 ring-violet-100"
-        : order.status === "returned"
-          ? "bg-rose-50 text-rose-700 ring-rose-100"
-          : "bg-blue-50 text-blue-700 ring-blue-100"
-      : "bg-slate-100 text-slate-500 ring-slate-200";
   const trackingStatusLabel = (order: Order) => {
     if (!order.ecotrack_tracking) return "غير مرفوعة";
     const raw = String(order.ecotrack_status || "").toLowerCase();
@@ -1048,7 +1039,6 @@ export default function Dashboard() {
   };
   const openOrder = (order: Order) => {
     setActiveOrderId(order.id);
-    setExpandedId(order.id);
     setOrderEvents([]);
     setShipmentUpdates([]);
     void fetch(`/api/orders?resource=events&orderId=${order.id}`, {
@@ -1065,7 +1055,6 @@ export default function Dashboard() {
   };
   const closeOrder = () => {
     setActiveOrderId(null);
-    setExpandedId(null);
     setEditing(null);
     setOrderEvents([]);
     setShipmentUpdates([]);
@@ -1188,7 +1177,6 @@ export default function Dashboard() {
       );
       setSelectedIds([]);
       setActiveOrderId(null);
-      setExpandedId(null);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -2029,13 +2017,36 @@ export default function Dashboard() {
                         </span>
                       </p>
                     </div>
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <span
-                        className={`rounded-full px-2 py-1 text-[10px] font-black ring-1 ${statusTone(order.status)}`}
-                      >
-                        {statusLabels[order.status]}
-                      </span>
-                    </div>
+                    <select
+                      value={order.status}
+                      onChange={event =>
+                        void updateStatus(
+                          order.id,
+                          event.target.value as OrderStatus
+                        )
+                      }
+                      disabled={
+                        loading ||
+                        [
+                          "shipped",
+                          "delivered",
+                          "returned",
+                          "trashed",
+                        ].includes(order.status)
+                      }
+                      aria-label="حالة الطلبية"
+                      className={`min-w-0 rounded-full border-0 px-2 py-1 text-[10px] font-black ring-1 outline-none ${statusTone(order.status)} disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      <option value="abandoned">غير مكتملة</option>
+                      <option value="complete">مكتملة</option>
+                      <option value="confirmed">مؤكدة</option>
+                      <option value="not_responding">لا يستجيب</option>
+                      <option value="cancelled">ملغاة</option>
+                      <option value="shipped">مرفوعة إلى EcoTrack</option>
+                      <option value="delivered">تم التسليم</option>
+                      <option value="returned">مرتجعة</option>
+                      <option value="trashed">في السلة</option>
+                    </select>
                   </div>
                   <div className="mt-2 border-t border-slate-100 pt-2">
                     <div className="mb-1 flex items-center justify-between">
@@ -2045,10 +2056,8 @@ export default function Dashboard() {
                             "شركة التوصيل غير محددة"}
                         </p>
                         {order.ecotrack_tracking && (
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ring-1 ${ecoTone(order)}`}
-                          >
-                            {trackingStatusLabel(order)}
+                          <span className="truncate text-[10px] font-bold text-blue-600">
+                            رقم التتبع: {order.ecotrack_tracking}
                           </span>
                         )}
                       </div>
@@ -2056,37 +2065,7 @@ export default function Dashboard() {
                         إجراءات الطلب
                       </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <select
-                        value={order.status}
-                        onChange={event =>
-                          void updateStatus(
-                            order.id,
-                            event.target.value as OrderStatus
-                          )
-                        }
-                        disabled={
-                          loading ||
-                          [
-                            "shipped",
-                            "delivered",
-                            "returned",
-                            "trashed",
-                          ].includes(order.status)
-                        }
-                        aria-label="حالة الطلبية"
-                        className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2.5 text-center text-[11px] font-black text-slate-700 outline-none transition hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <option value="abandoned">غير مكتملة</option>
-                        <option value="complete">مكتملة</option>
-                        <option value="confirmed">مؤكدة</option>
-                        <option value="not_responding">لا يستجيب</option>
-                        <option value="cancelled">ملغاة</option>
-                        <option value="shipped">مرفوعة</option>
-                        <option value="delivered">تم التسليم</option>
-                        <option value="returned">مرتجعة</option>
-                        <option value="trashed">في السلة</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => {
@@ -2108,29 +2087,6 @@ export default function Dashboard() {
                       </button>
                     </div>
                   </div>
-                  {expandedId === order.id && (
-                    <div className="mt-3 rounded-2xl bg-slate-50 p-3 text-sm">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-[10px] font-bold text-slate-400">
-                            الموقع
-                          </p>
-                          <p className="mt-1 truncate text-xs font-bold">
-                            {order.wilaya || "—"}
-                            {order.commune ? `، ${order.commune}` : ""}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-slate-400">
-                            التتبع
-                          </p>
-                          <p className="mt-1 truncate text-xs font-bold">
-                            {order.ecotrack_tracking || "غير مرفوع"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </article>
               ))}
             </div>

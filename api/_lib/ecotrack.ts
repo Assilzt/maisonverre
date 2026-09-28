@@ -485,18 +485,75 @@ export async function fetchEcoTrackTracking(
   >;
   if (!response.ok)
     throw new Error(`تعذر جلب تتبع الشحنة (${response.status})`);
-  const nested =
-    payload.data && typeof payload.data === "object"
-      ? (payload.data as Record<string, unknown>)
-      : payload;
+  const nested = extractTrackingRecord(payload, tracking);
   return {
-    status: nested.status || payload.status || null,
-    activity: Array.isArray(nested.activity)
-      ? (nested.activity as EcoTrackTrackingActivity[])
-      : [],
+    status: trackingStatusValue(nested),
+    activity: trackingActivities(nested),
     raw: payload,
   };
 }
+
+const trackingStatusValue = (record: Record<string, unknown>) =>
+  record.status ??
+  record.status_name ??
+  record.state ??
+  record.etat ??
+  record.last_status ??
+  null;
+
+const trackingActivities = (record: Record<string, unknown>) => {
+  const value =
+    record.activity ??
+    record.activities ??
+    record.history ??
+    record.updates ??
+    record.maj;
+  return Array.isArray(value) ? (value as EcoTrackTrackingActivity[]) : [];
+};
+
+const trackingKey = (record: Record<string, unknown>) =>
+  String(
+    record.tracking ??
+      record.tracking_number ??
+      record.trackingNumber ??
+      record.numero ??
+      record.num_colis ??
+      ""
+  );
+
+const extractTrackingRecord = (
+  payload: Record<string, unknown>,
+  tracking: string
+) => {
+  const data = payload.data;
+  if (Array.isArray(data)) {
+    return (data.find(
+      item =>
+        item &&
+        typeof item === "object" &&
+        trackingKey(item as Record<string, unknown>) === tracking
+    ) ||
+      data[0] ||
+      payload) as Record<string, unknown>;
+  }
+  if (data && typeof data === "object") {
+    const objectData = data as Record<string, unknown>;
+    const direct = objectData[tracking];
+    if (direct && typeof direct === "object")
+      return direct as Record<string, unknown>;
+    if (trackingKey(objectData) === tracking) return objectData;
+    const nested = Object.values(objectData).find(
+      item =>
+        item &&
+        typeof item === "object" &&
+        trackingKey(item as Record<string, unknown>) === tracking
+    );
+    if (nested && typeof nested === "object")
+      return nested as Record<string, unknown>;
+    return objectData;
+  }
+  return payload;
+};
 
 export async function fetchEcoTrackTrackingsInfo(
   trackings: string[],
@@ -516,11 +573,30 @@ export async function fetchEcoTrackTrackingsInfo(
   >;
   if (!response.ok)
     throw new Error(`تعذر جلب تفاصيل الشحنات (${response.status})`);
-  const data =
-    payload.data && typeof payload.data === "object"
-      ? (payload.data as Record<string, unknown>)
-      : payload;
-  return data;
+  const result: Record<string, Record<string, unknown>> = {};
+  const data = payload.data;
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      if (!item || typeof item !== "object") continue;
+      const record = item as Record<string, unknown>;
+      const key = trackingKey(record);
+      if (key) result[key] = record;
+    }
+  } else if (data && typeof data === "object") {
+    for (const [key, value] of Object.entries(
+      data as Record<string, unknown>
+    )) {
+      if (value && typeof value === "object")
+        result[key] = value as Record<string, unknown>;
+    }
+  }
+  for (const tracking of trackings) {
+    if (result[tracking]) continue;
+    const direct = payload[tracking];
+    if (direct && typeof direct === "object")
+      result[tracking] = direct as Record<string, unknown>;
+  }
+  return result;
 }
 
 export async function fetchEcoTrackUpdates(
