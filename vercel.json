@@ -2,5 +2,11 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm build",
   "outputDirectory": "dist/public",
-  "framework": "vite"
+  "framework": "vite",
+  "crons": [
+    {
+      "path": "/api/orders?resource=sync",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }

@@ -206,6 +206,12 @@ const isAdmin = (request: Request) =>
     dashboardPassword &&
       headerValue(request, "x-dashboard-password") === dashboardPassword
   );
+const isCron = (request: Request) =>
+  Boolean(
+    process.env.CRON_SECRET &&
+      headerValue(request, "authorization") ===
+        `Bearer ${process.env.CRON_SECRET}`
+  );
 const queryValue = (request: Request, name: string) => {
   const value = request.query?.[name];
   return Array.isArray(value) ? value[0] : value;
@@ -386,6 +392,17 @@ const shippingModeFromBody = (
   if (body.shipFromStock === true) return "stock";
   if (body.shipFromStock === false) return "without_stock";
   return null;
+};
+
+const canManualTransition = (order: OrderRow, nextStatus: string) => {
+  if (order.ecotrack_tracking) return false;
+  if (nextStatus === "confirmed")
+    return ["abandoned", "complete", "not_responding"].includes(order.status);
+  if (nextStatus === "cancelled")
+    return ["abandoned", "complete", "not_responding", "confirmed"].includes(
+      order.status
+    );
+  return false;
 };
 
 export default async function handler(request: Request, response: Response) {
@@ -573,7 +590,7 @@ export default async function handler(request: Request, response: Response) {
         response.status(200).json({ events });
         return;
       }
-      if (!isAdmin(request)) {
+      if (resource !== "sync" && !isAdmin(request)) {
         response.status(401).json({ error: "غير مصرح" });
         return;
       }
@@ -637,6 +654,10 @@ export default async function handler(request: Request, response: Response) {
         return;
       }
       if (resource === "sync") {
+        if (!isAdmin(request) && !isCron(request)) {
+          response.status(401).json({ error: "غير مصرح" });
+          return;
+        }
         const syncProviders = ecoSettings.providers.length
           ? ecoSettings.providers
           : [ecoSettings];
@@ -787,6 +808,17 @@ export default async function handler(request: Request, response: Response) {
         const order = await rowById(orderId);
         if (!order) {
           response.status(404).json({ error: "الطلب غير موجود" });
+          return;
+        }
+        if (
+          order.ecotrack_tracking ||
+          ["delivered", "returned", "cancelled", "trashed"].includes(
+            order.status
+          )
+        ) {
+          response
+            .status(409)
+            .json({ error: "لا يمكن تسجيل اتصال لطلب مرفوع أو نهائي" });
           return;
         }
         const result = String(body.result || "contacted").slice(0, 32);
@@ -1318,16 +1350,7 @@ export default async function handler(request: Request, response: Response) {
 
       const orderId = Number(body.id);
       const status = String(body.status || "");
-      const allowedStatuses = [
-        "abandoned",
-        "complete",
-        "confirmed",
-        "not_responding",
-        "cancelled",
-        "shipped",
-        "delivered",
-        "returned",
-      ];
+      const allowedStatuses = ["confirmed", "cancelled"];
       if (!Number.isInteger(orderId) || !allowedStatuses.includes(status)) {
         response.status(400).json({ error: "بيانات الحالة غير صالحة" });
         return;
@@ -1337,14 +1360,22 @@ export default async function handler(request: Request, response: Response) {
         response.status(404).json({ error: "الطلب غير موجود" });
         return;
       }
-      if (status === "cancelled" && order.ecotrack_tracking) {
-        response
-          .status(409)
-          .json({ error: "استخدم زر إلغاء الرفع أولاً قبل إلغاء الطلب" });
+      if (!canManualTransition(order, status)) {
+        response.status(409).json({
+          error:
+            "هذا الانتقال غير مسموح؛ استخدم الإجراء المناسب للحالة الحالية",
+        });
         return;
       }
       const updated =
-        await sql!`UPDATE atlasio_orders SET status = ${status}, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+        await sql!`UPDATE atlasio_orders SET status = ${status}, confirmation_status = CASE WHEN ${status} = 'confirmed' THEN 'confirmed' ELSE 'cancelled' END, contact_result = CASE WHEN ${status} = 'cancelled' THEN 'refused' ELSE contact_result END, updated_at = NOW() WHERE id = ${orderId} RETURNING ${sql!.unsafe(selectColumns)}`;
+      await recordEvent(
+        orderId,
+        "status_changed",
+        `تم تغيير حالة الطلب إلى ${status === "confirmed" ? "مؤكد" : "ملغى"}`,
+        order.status,
+        status
+      );
       response
         .status(200)
         .json({ order: updated[0], message: "تم تحديث حالة الطلب" });

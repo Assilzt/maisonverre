@@ -119,10 +119,10 @@ type Order = {
 
 const statusLabels: Record<OrderStatus | "all", string> = {
   all: "الكل",
-  abandoned: "غير مكتملة",
-  complete: "مكتملة",
+  abandoned: "يحتاج تأكيد",
+  complete: "يحتاج تأكيد",
   confirmed: "مؤكدة",
-  not_responding: "لا يستجيب",
+  not_responding: "يحتاج متابعة",
   cancelled: "ملغاة",
   shipped: "مرفوعة إلى EcoTrack",
   delivered: "تم التسليم",
@@ -426,36 +426,6 @@ export default function Dashboard() {
     // The interval intentionally follows the authenticated dashboard session only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [password]);
-
-  const updateStatus = async (id: number, nextStatus: OrderStatus) => {
-    setError("");
-    setLoading(true);
-    try {
-      const response = await fetch("/api/orders", {
-        method: "PATCH",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status: nextStatus }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "تعذر تحديث حالة الطلب");
-      setOrders(current =>
-        current.map(order =>
-          order.id === id
-            ? data.order || { ...order, status: nextStatus }
-            : order
-        )
-      );
-      setSelectedIds(current => current.filter(item => item !== id));
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "تعذر تحديث حالة الطلب"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const saveProviderProfile = async () => {
     const name = providerNameDraft.trim();
@@ -1828,10 +1798,8 @@ export default function Dashboard() {
                   className="rounded-xl bg-slate-950 px-3 py-2.5 text-xs font-black text-white outline-none"
                 >
                   <option value="">تغيير الحالة</option>
-                  <option value="complete">مكتملة</option>
-                  <option value="confirmed">مؤكدة</option>
-                  <option value="not_responding">لا يستجيب</option>
-                  <option value="cancelled">ملغاة</option>
+                  <option value="confirmed">تأكيد المحدد</option>
+                  <option value="cancelled">إلغاء المحدد</option>
                 </select>
                 <button
                   type="button"
@@ -2017,36 +1985,11 @@ export default function Dashboard() {
                         </span>
                       </p>
                     </div>
-                    <select
-                      value={order.status}
-                      onChange={event =>
-                        void updateStatus(
-                          order.id,
-                          event.target.value as OrderStatus
-                        )
-                      }
-                      disabled={
-                        loading ||
-                        [
-                          "shipped",
-                          "delivered",
-                          "returned",
-                          "trashed",
-                        ].includes(order.status)
-                      }
-                      aria-label="حالة الطلبية"
-                      className={`min-w-0 rounded-full border-0 px-2 py-1 text-[10px] font-black ring-1 outline-none ${statusTone(order.status)} disabled:cursor-not-allowed disabled:opacity-60`}
+                    <span
+                      className={`rounded-full px-2 py-1 text-[10px] font-black ring-1 ${statusTone(order.status)}`}
                     >
-                      <option value="abandoned">غير مكتملة</option>
-                      <option value="complete">مكتملة</option>
-                      <option value="confirmed">مؤكدة</option>
-                      <option value="not_responding">لا يستجيب</option>
-                      <option value="cancelled">ملغاة</option>
-                      <option value="shipped">مرفوعة إلى EcoTrack</option>
-                      <option value="delivered">تم التسليم</option>
-                      <option value="returned">مرتجعة</option>
-                      <option value="trashed">في السلة</option>
-                    </select>
+                      {statusLabels[order.status]}
+                    </span>
                   </div>
                   <div className="mt-2 border-t border-slate-100 pt-2">
                     <div className="mb-1 flex items-center justify-between">
@@ -2065,7 +2008,55 @@ export default function Dashboard() {
                         إجراءات الطلب
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      {!order.ecotrack_tracking &&
+                        ["abandoned", "complete", "not_responding"].includes(
+                          order.status
+                        ) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void recordContact(order, "confirmed")
+                              }
+                              disabled={loading || contactBusy}
+                              className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-emerald-500 px-2 py-2.5 text-[11px] font-black text-white transition hover:bg-emerald-600 disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />{" "}
+                              تأكيد
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void recordContact(order, "refused")
+                              }
+                              disabled={loading || contactBusy}
+                              className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-rose-50 px-2 py-2.5 text-[11px] font-black text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                            >
+                              <X className="h-3.5 w-3.5 shrink-0" /> رفض
+                            </button>
+                          </>
+                        )}
+                      {order.status === "confirmed" &&
+                        !order.ecotrack_tracking && (
+                          <button
+                            type="button"
+                            onClick={() => void runAction(order.id, "ship")}
+                            disabled={loading}
+                            className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-emerald-500 px-2 py-2.5 text-[11px] font-black text-white transition hover:bg-emerald-600 disabled:opacity-50"
+                          >
+                            <Truck className="h-3.5 w-3.5 shrink-0" /> رفع
+                          </button>
+                        )}
+                      {order.ecotrack_tracking && (
+                        <button
+                          type="button"
+                          onClick={() => openOrder(order)}
+                          className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-blue-50 px-2 py-2.5 text-[11px] font-black text-blue-700 transition hover:bg-blue-100"
+                        >
+                          <Truck className="h-3.5 w-3.5 shrink-0" /> تتبع
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -2083,7 +2074,7 @@ export default function Dashboard() {
                         className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-emerald-50 px-2 py-2.5 text-[11px] font-black text-emerald-700 transition hover:bg-emerald-100"
                       >
                         <Truck className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">حالة EcoTrack</span>
+                        <span className="truncate">تفاصيل</span>
                       </button>
                     </div>
                   </div>
