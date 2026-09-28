@@ -233,7 +233,6 @@ export default function Dashboard() {
     | "completed"
     | "analytics"
   >("orders");
-  const [showAllOrders, setShowAllOrders] = useState(false);
   const [query, setQuery] = useState("");
   const [datePreset, setDatePreset] = useState<
     | "all"
@@ -296,7 +295,6 @@ export default function Dashboard() {
   ) => {
     setSection(nextSection);
     setStatus("all");
-    setShowAllOrders(false);
     setSelectedIds([]);
     setDrawerOpen(false);
   };
@@ -800,14 +798,7 @@ export default function Dashboard() {
             : section === "incomplete"
               ? ["abandoned", "not_responding"].includes(order.status)
               : section === "confirmation"
-                ? order.status !== "trashed" &&
-                  ![
-                    "confirmed",
-                    "shipped",
-                    "delivered",
-                    "returned",
-                    "cancelled",
-                  ].includes(order.status)
+                ? ["abandoned", "complete"].includes(order.status)
                 : section === "shipping"
                   ? order.status === "confirmed" ||
                     order.shipment_status === "failed"
@@ -820,11 +811,7 @@ export default function Dashboard() {
                         ? order.status === "delivered"
                         : section === "analytics"
                           ? order.status !== "trashed"
-                          : order.status !== "trashed" &&
-                            (showAllOrders ||
-                              ["confirmed", "cancelled", "shipped"].includes(
-                                order.status
-                              ));
+                          : order.status !== "trashed";
         const matchesStatus = status === "all" || order.status === status;
         const normalizedQuery = query.trim().toLowerCase();
         const haystack = [
@@ -851,35 +838,49 @@ export default function Dashboard() {
           (!normalizedQuery || haystack.includes(normalizedQuery))
         );
       }),
-    [dateRange, orders, query, section, showAllOrders, status]
+    [dateRange, orders, query, section, status]
   );
   const counts = orders.reduce<Record<string, number>>((result, order) => {
     result[order.status] = (result[order.status] || 0) + 1;
     return result;
   }, {});
+  const confirmationQueueCount = orders.filter(order =>
+    ["abandoned", "complete"].includes(order.status)
+  ).length;
+  const followUpCount = orders.filter(order =>
+    ["not_responding"].includes(order.status)
+  ).length;
+  const shippingQueueCount = orders.filter(
+    order => order.status === "confirmed" || order.shipment_status === "failed"
+  ).length;
+  const trackingQueueCount = orders.filter(
+    order =>
+      Boolean(order.ecotrack_tracking) &&
+      !["delivered", "returned"].includes(order.status)
+  ).length;
   const sectionTitle =
     section === "orders"
-      ? "الطلبات"
+      ? "الواردة"
       : section === "incomplete"
-        ? "غير مكتملة"
+        ? "تحتاج متابعة"
         : section === "trash"
           ? "سلة المهملات"
           : section === "confirmation"
-            ? "مركز التأكيد"
+            ? "التأكيد"
             : section === "shipping"
-              ? "مركز الشحن"
+              ? "الشحن"
               : section === "tracking"
-                ? "مركز التتبع"
+                ? "التتبع"
                 : section === "returns"
                   ? "المرتجعات"
                   : section === "completed"
-                    ? "المكتملة"
+                    ? "تم التسليم"
                     : "التحليلات";
   const sectionDescription =
     section === "orders"
-      ? "الطلبات الجاهزة للمتابعة والشحن"
+      ? "كل الطلبات غير المحذوفة — ابدأ من طابور العمل اليومي"
       : section === "incomplete"
-        ? "طلبات تحتاج بيانات أو متابعة قبل اعتمادها"
+        ? "طلبات لم تُحسم بعد وتحتاج متابعة أو محاولة اتصال جديدة"
         : section === "trash"
           ? "الطلبات المحذوفة مؤقتاً ويمكن استرجاعها"
           : section === "confirmation"
@@ -1031,17 +1032,8 @@ export default function Dashboard() {
   };
   const startWork = () => {
     const next =
-      orders.find(
-        order =>
-          order.status !== "trashed" &&
-          ![
-            "confirmed",
-            "shipped",
-            "delivered",
-            "returned",
-            "cancelled",
-          ].includes(order.status)
-      ) ||
+      orders.find(order => ["abandoned", "complete"].includes(order.status)) ||
+      orders.find(order => ["not_responding"].includes(order.status)) ||
       orders.find(
         order =>
           order.status === "confirmed" || order.shipment_status === "failed"
@@ -1055,20 +1047,15 @@ export default function Dashboard() {
       setError("لا توجد طلبات تحتاج إلى إجراء حالياً");
       return;
     }
-    const nextSection = ![
-      "confirmed",
-      "shipped",
-      "delivered",
-      "returned",
-      "cancelled",
-    ].includes(next.status)
+    const nextSection = ["abandoned", "complete"].includes(next.status)
       ? "confirmation"
-      : next.status === "confirmed"
-        ? "shipping"
-        : "tracking";
+      : ["not_responding"].includes(next.status)
+        ? "incomplete"
+        : next.status === "confirmed"
+          ? "shipping"
+          : "tracking";
     setSection(nextSection);
     setStatus("all");
-    setShowAllOrders(false);
     openOrder(next);
   };
   const recordContact = async (order: Order, result: string) => {
@@ -1335,14 +1322,17 @@ export default function Dashboard() {
             </div>
           </div>
           <nav className="space-y-2 text-sm font-semibold">
+            <p className="px-3 pb-1 text-[10px] font-black uppercase tracking-[.18em] text-slate-500">
+              سير العمل
+            </p>
             <button
               type="button"
               onClick={() => goToSection("orders")}
               className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === "orders" ? "bg-white/10 text-emerald-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
             >
-              <ClipboardList className="h-4 w-4" /> الطلبات{" "}
+              <ClipboardList className="h-4 w-4" /> الواردة{" "}
               <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
-                {counts.confirmed || 0}
+                {totalOrderCount}
               </span>
             </button>
             <button
@@ -1352,19 +1342,7 @@ export default function Dashboard() {
             >
               <Phone className="h-4 w-4" /> التأكيد{" "}
               <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
-                {
-                  orders.filter(
-                    item =>
-                      item.status !== "trashed" &&
-                      ![
-                        "confirmed",
-                        "shipped",
-                        "delivered",
-                        "returned",
-                        "cancelled",
-                      ].includes(item.status)
-                  ).length
-                }
+                {confirmationQueueCount}
               </span>
             </button>
             <button
@@ -1374,7 +1352,7 @@ export default function Dashboard() {
             >
               <Truck className="h-4 w-4" /> الشحن{" "}
               <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
-                {confirmedCount}
+                {shippingQueueCount}
               </span>
             </button>
             <button
@@ -1382,55 +1360,63 @@ export default function Dashboard() {
               onClick={() => goToSection("tracking")}
               className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === "tracking" ? "bg-white/10 text-violet-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
             >
-              <RefreshCw className="h-4 w-4" /> التتبع
-            </button>
-            <button
-              type="button"
-              onClick={() => goToSection("returns")}
-              className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === "returns" ? "bg-white/10 text-rose-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
-            >
-              <Archive className="h-4 w-4" /> المرتجعات{" "}
+              <RefreshCw className="h-4 w-4" /> التتبع{" "}
               <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
-                {counts.returned || 0}
+                {trackingQueueCount}
               </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => goToSection("completed")}
-              className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === "completed" ? "bg-white/10 text-violet-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
-            >
-              <CheckCircle2 className="h-4 w-4" /> المكتملة{" "}
-              <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
-                {counts.delivered || 0}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => goToSection("analytics")}
-              className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === "analytics" ? "bg-white/10 text-emerald-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
-            >
-              <CheckCircle2 className="h-4 w-4" /> التحليلات
             </button>
             <button
               type="button"
               onClick={() => goToSection("incomplete")}
-              className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === "incomplete" ? "bg-white/10 text-amber-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
+              className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === "incomplete" ? "bg-white/10 text-orange-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
             >
-              <Package className="h-4 w-4" /> غير مكتملة{" "}
+              <Package className="h-4 w-4" /> تحتاج متابعة{" "}
               <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
-                {(counts.abandoned || 0) + (counts.not_responding || 0)}
+                {followUpCount}
               </span>
             </button>
-            <button
-              type="button"
-              onClick={() => goToSection("trash")}
-              className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === "trash" ? "bg-white/10 text-rose-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
-            >
-              <Archive className="h-4 w-4" /> سلة المهملات{" "}
-              <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
-                {counts.trashed || 0}
-              </span>
-            </button>
+            <div className="my-3 border-t border-white/10 pt-3">
+              <p className="px-3 pb-1 text-[10px] font-black uppercase tracking-[.18em] text-slate-500">
+                الأرشيف والتقارير
+              </p>
+              <button
+                type="button"
+                onClick={() => goToSection("completed")}
+                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 transition ${section === "completed" ? "bg-white/10 text-violet-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
+              >
+                <CheckCircle2 className="h-4 w-4" /> تم التسليم{" "}
+                <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
+                  {counts.delivered || 0}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => goToSection("returns")}
+                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 transition ${section === "returns" ? "bg-white/10 text-rose-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
+              >
+                <Archive className="h-4 w-4" /> المرتجعات{" "}
+                <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
+                  {counts.returned || 0}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => goToSection("analytics")}
+                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 transition ${section === "analytics" ? "bg-white/10 text-emerald-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
+              >
+                <Info className="h-4 w-4" /> التقارير
+              </button>
+              <button
+                type="button"
+                onClick={() => goToSection("trash")}
+                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 transition ${section === "trash" ? "bg-white/10 text-rose-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
+              >
+                <Trash2 className="h-4 w-4" /> المحذوفات{" "}
+                <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
+                  {counts.trashed || 0}
+                </span>
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => void syncStatuses()}
@@ -1516,10 +1502,10 @@ export default function Dashboard() {
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[.18em] text-emerald-300">
-                    WORK QUEUE
+                    DAILY WORK QUEUE
                   </p>
                   <h2 className="mt-1 text-lg font-black">
-                    ماذا يحتاج العمل الآن؟
+                    طابور العمل اليومي
                   </h2>
                 </div>
                 <button
@@ -1530,29 +1516,20 @@ export default function Dashboard() {
                   <Play className="h-4 w-4" /> ابدأ العمل
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+              <p className="mb-3 text-xs font-semibold text-slate-400">
+                ابدأ من أول طابور يحتوي على طلبات تحتاج إجراءً.
+              </p>
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                 <button
                   type="button"
                   onClick={() => goToSection("confirmation")}
                   className="rounded-2xl bg-white/10 p-3 text-right transition hover:bg-white/15"
                 >
                   <p className="text-[11px] font-bold text-amber-200">
-                    جديدة للتأكيد
+                    تحتاج تأكيد
                   </p>
                   <p className="mt-1 text-2xl font-black">
-                    {
-                      orders.filter(
-                        order =>
-                          order.status !== "trashed" &&
-                          ![
-                            "confirmed",
-                            "shipped",
-                            "delivered",
-                            "returned",
-                            "cancelled",
-                          ].includes(order.status)
-                      ).length
-                    }
+                    {confirmationQueueCount}
                   </p>
                 </button>
                 <button
@@ -1561,7 +1538,7 @@ export default function Dashboard() {
                   className="rounded-2xl bg-white/10 p-3 text-right transition hover:bg-white/15"
                 >
                   <p className="text-[11px] font-bold text-emerald-200">
-                    جاهزة للشحن
+                    جاهزة للرفع
                   </p>
                   <p className="mt-1 text-2xl font-black">
                     {
@@ -1599,19 +1576,7 @@ export default function Dashboard() {
                   <p className="text-[11px] font-bold text-orange-200">
                     تحتاج متابعة
                   </p>
-                  <p className="mt-1 text-2xl font-black">
-                    {(counts.abandoned || 0) + (counts.not_responding || 0)}
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => goToSection("completed")}
-                  className="rounded-2xl bg-white/10 p-3 text-right transition hover:bg-white/15"
-                >
-                  <p className="text-[11px] font-bold text-violet-200">
-                    مكتملة
-                  </p>
-                  <p className="mt-1 text-2xl font-black">{deliveredCount}</p>
+                  <p className="mt-1 text-2xl font-black">{followUpCount}</p>
                 </button>
               </div>
             </section>
@@ -1621,11 +1586,7 @@ export default function Dashboard() {
               <p className="text-xs font-bold text-slate-400">في هذا القسم</p>
               <p className="mt-2 text-2xl font-black">
                 {section === "orders"
-                  ? showAllOrders
-                    ? orders.filter(order => order.status !== "trashed").length
-                    : (counts.confirmed || 0) +
-                      (counts.cancelled || 0) +
-                      (counts.shipped || 0)
+                  ? orders.filter(order => order.status !== "trashed").length
                   : visibleOrders.length}
               </p>
             </div>
@@ -1682,55 +1643,30 @@ export default function Dashboard() {
               </div>
             </section>
           )}
-          <section className="mb-4 flex flex-wrap items-center gap-2 rounded-[22px] bg-white p-2 shadow-sm ring-1 ring-slate-200/70">
+          <section className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[22px] bg-white p-3 shadow-sm ring-1 ring-slate-200/70">
+            <div>
+              <p className="text-xs font-black text-slate-700">
+                {section === "orders" ? "كل الطلبات الواردة" : sectionTitle}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                {section === "orders"
+                  ? "استخدم أزرار البطاقة للانتقال للخطوة التالية فقط"
+                  : "هذه القائمة تعرض الطلبات التي تنتمي لهذه المرحلة"}
+              </p>
+            </div>
             {section === "orders" && (
-              <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
-                {(["all", "confirmed", "cancelled", "shipped"] as const).map(
-                  item => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setStatus(item)}
-                      className={`flex shrink-0 items-center gap-2 rounded-2xl px-3.5 py-2.5 text-xs font-bold transition active:scale-95 ${status === item ? "bg-slate-950 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"}`}
-                    >
-                      {item === "all" ? "الرئيسية" : statusLabels[item]}{" "}
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-[10px] ${status === item ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500"}`}
-                      >
-                        {item === "all"
-                          ? showAllOrders
-                            ? orders.filter(order => order.status !== "trashed")
-                                .length
-                            : (counts.confirmed || 0) +
-                              (counts.cancelled || 0) +
-                              (counts.shipped || 0)
-                          : counts[item] || 0}
-                      </span>
-                    </button>
-                  )
-                )}
-              </div>
-            )}
-            {section === "orders" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAllOrders(current => !current);
-                  setStatus("all");
-                }}
-                className={`rounded-2xl px-3.5 py-2.5 text-xs font-black transition ${showAllOrders ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
-              >
-                {showAllOrders ? "الطلبات الأساسية" : "عرض كل الطلبات"}
-              </button>
+              <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-emerald-700">
+                {visibleOrders.length} طلب
+              </span>
             )}
             {section === "trash" && (
               <p className="px-3 py-2 text-xs font-bold text-rose-700">
-                المحذوفات مؤقتاً — يمكنك استرجاعها من تفاصيل الطلب
+                الأرشيف المؤقت — يمكنك استرجاع الطلب من تفاصيله
               </p>
             )}
             {section === "incomplete" && (
               <p className="px-3 py-2 text-xs font-bold text-amber-700">
-                أكمل البيانات أو انقل الطلب للسلة عند الحاجة
+                جرّب الاتصال مجدداً أو انقل الطلب إلى الملغاة من التفاصيل
               </p>
             )}
           </section>
@@ -1787,20 +1723,22 @@ export default function Dashboard() {
                 >
                   <FileDown className="h-4 w-4" /> تصدير PDF
                 </button>
-                <select
+                <button
+                  type="button"
                   disabled={bulkBusy}
-                  defaultValue=""
-                  onChange={event => {
-                    const value = event.target.value as OrderStatus;
-                    if (value) void bulkUpdate(value);
-                    event.currentTarget.value = "";
-                  }}
-                  className="rounded-xl bg-slate-950 px-3 py-2.5 text-xs font-black text-white outline-none"
+                  onClick={() => void bulkUpdate("confirmed")}
+                  className="rounded-xl bg-emerald-500 px-3 py-2.5 text-xs font-black text-white transition hover:bg-emerald-600 disabled:opacity-50"
                 >
-                  <option value="">تغيير الحالة</option>
-                  <option value="confirmed">تأكيد المحدد</option>
-                  <option value="cancelled">إلغاء المحدد</option>
-                </select>
+                  تأكيد المحدد
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={() => void bulkUpdate("cancelled")}
+                  className="rounded-xl bg-slate-100 px-3 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-200 disabled:opacity-50"
+                >
+                  إلغاء المحدد
+                </button>
                 <button
                   type="button"
                   disabled={bulkBusy}
@@ -2109,112 +2047,71 @@ export default function Dashboard() {
           </button>
         </div>
         <div className="mb-5 space-y-2 border-b border-slate-100 pb-5">
-          <p className="px-1 text-xs font-black text-slate-400">الأقسام</p>
+          <p className="px-1 text-xs font-black text-slate-400">سير العمل</p>
+          {[
+            ["orders", "الواردة", totalOrderCount, ClipboardList],
+            ["confirmation", "التأكيد", confirmationQueueCount, Phone],
+            ["shipping", "الشحن", shippingQueueCount, Truck],
+            ["tracking", "التتبع", trackingQueueCount, RefreshCw],
+            ["incomplete", "تحتاج متابعة", followUpCount, Package],
+          ].map(item => {
+            const key = item[0] as typeof section;
+            const label = item[1] as string;
+            const count = item[2] as number;
+            const Icon = item[3] as typeof ClipboardList;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => goToSection(key)}
+                className={`flex w-full items-center justify-between rounded-2xl p-4 text-right text-sm font-black ${section === key ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-700"}`}
+              >
+                <span className="flex items-center gap-3">
+                  <Icon className="h-5 w-5" /> {label}
+                </span>
+                <span>{count}</span>
+              </button>
+            );
+          })}
+          <p className="mt-4 px-1 text-xs font-black text-slate-400">
+            الأرشيف والتقارير
+          </p>
           <button
             type="button"
-            onClick={() => goToSection("orders")}
-            className={`flex w-full items-center justify-between rounded-2xl p-4 text-right text-sm font-black ${section === "orders" ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-700"}`}
+            onClick={() => goToSection("completed")}
+            className={`flex w-full items-center justify-between rounded-2xl p-3 text-right text-sm font-black ${section === "completed" ? "bg-violet-50 text-violet-800" : "bg-slate-50 text-slate-700"}`}
           >
             <span className="flex items-center gap-3">
-              <ClipboardList className="h-5 w-5" /> الطلبات
+              <CheckCircle2 className="h-5 w-5" /> تم التسليم
             </span>
-            <span>
-              {(counts.confirmed || 0) +
-                (counts.cancelled || 0) +
-                (counts.shipped || 0)}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => goToSection("confirmation")}
-            className={`flex w-full items-center justify-between rounded-2xl p-4 text-right text-sm font-black ${section === "confirmation" ? "bg-amber-50 text-amber-800" : "bg-slate-50 text-slate-700"}`}
-          >
-            <span className="flex items-center gap-3">
-              <Phone className="h-5 w-5" /> التأكيد
-            </span>
-            <span>
-              {
-                orders.filter(
-                  item =>
-                    item.status !== "trashed" &&
-                    ![
-                      "confirmed",
-                      "shipped",
-                      "delivered",
-                      "returned",
-                      "cancelled",
-                    ].includes(item.status)
-                ).length
-              }
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => goToSection("shipping")}
-            className={`flex w-full items-center justify-between rounded-2xl p-4 text-right text-sm font-black ${section === "shipping" ? "bg-blue-50 text-blue-800" : "bg-slate-50 text-slate-700"}`}
-          >
-            <span className="flex items-center gap-3">
-              <Truck className="h-5 w-5" /> الشحن
-            </span>
-            <span>{confirmedCount}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => goToSection("tracking")}
-            className={`flex w-full items-center justify-between rounded-2xl p-4 text-right text-sm font-black ${section === "tracking" ? "bg-violet-50 text-violet-800" : "bg-slate-50 text-slate-700"}`}
-          >
-            <span className="flex items-center gap-3">
-              <RefreshCw className="h-5 w-5" /> التتبع
-            </span>
+            <span>{counts.delivered || 0}</span>
           </button>
           <button
             type="button"
             onClick={() => goToSection("returns")}
-            className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === "returns" ? "bg-white/10 text-rose-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
+            className={`flex w-full items-center justify-between rounded-2xl p-3 text-right text-sm font-black ${section === "returns" ? "bg-rose-50 text-rose-800" : "bg-slate-50 text-slate-700"}`}
           >
-            <Archive className="h-4 w-4" /> المرتجعات{" "}
-            <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
-              {counts.returned || 0}
+            <span className="flex items-center gap-3">
+              <Archive className="h-5 w-5" /> المرتجعات
             </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => goToSection("completed")}
-            className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 transition ${section === "completed" ? "bg-white/10 text-violet-300" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
-          >
-            <CheckCircle2 className="h-4 w-4" /> المكتملة{" "}
-            <span className="mr-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
-              {counts.delivered || 0}
-            </span>
+            <span>{counts.returned || 0}</span>
           </button>
           <button
             type="button"
             onClick={() => goToSection("analytics")}
-            className={`flex w-full items-center justify-between rounded-2xl p-4 text-right text-sm font-black ${section === "analytics" ? "bg-emerald-50 text-emerald-800" : "bg-slate-50 text-slate-700"}`}
+            className={`flex w-full items-center justify-between rounded-2xl p-3 text-right text-sm font-black ${section === "analytics" ? "bg-emerald-50 text-emerald-800" : "bg-slate-50 text-slate-700"}`}
           >
             <span className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5" /> التحليلات
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => goToSection("incomplete")}
-            className={`flex w-full items-center justify-between rounded-2xl p-4 text-right text-sm font-black ${section === "incomplete" ? "bg-amber-50 text-amber-800" : "bg-slate-50 text-slate-700"}`}
-          >
-            <span className="flex items-center gap-3">
-              <Package className="h-5 w-5" /> غير مكتملة
-            </span>
-            <span>
-              {(counts.abandoned || 0) + (counts.not_responding || 0)}
+              <Info className="h-5 w-5" /> التقارير
             </span>
           </button>
           <button
             type="button"
             onClick={() => goToSection("trash")}
-            className={`flex w-full items-center justify-between rounded-2xl p-4 text-right text-sm font-black ${section === "trash" ? "bg-rose-50 text-rose-800" : "bg-slate-50 text-slate-700"}`}
+            className={`flex w-full items-center justify-between rounded-2xl p-3 text-right text-sm font-black ${section === "trash" ? "bg-rose-50 text-rose-800" : "bg-slate-50 text-slate-700"}`}
           >
             <span className="flex items-center gap-3">
-              <Archive className="h-5 w-5" /> سلة المهملات
+              <Trash2 className="h-5 w-5" /> المحذوفات
             </span>
             <span>{counts.trashed || 0}</span>
           </button>
