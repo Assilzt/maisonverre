@@ -113,6 +113,33 @@ const firstArray = (value: unknown): unknown[] => {
   return [];
 };
 
+const quantityFrom = (item: Record<string, unknown>) => {
+  const candidates = [
+    item.quantity,
+    item.quantite,
+    item.qte,
+    item.stock_quantity,
+    item.quantity_available,
+    item.available_quantity,
+    item.available_qty,
+    item.stock_qty,
+    item.qty,
+    item.available,
+    item.stock,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) return Math.max(0, candidate);
+    if (typeof candidate === 'string' && candidate.trim() !== '' && Number.isFinite(Number(candidate))) return Math.max(0, Number(candidate));
+    if (candidate && typeof candidate === 'object') {
+      const nested = candidate as Record<string, unknown>;
+      const nestedValue = nested.quantity ?? nested.quantite ?? nested.qte ?? nested.available ?? nested.qty;
+      if (typeof nestedValue === 'number' && Number.isFinite(nestedValue)) return Math.max(0, nestedValue);
+      if (typeof nestedValue === 'string' && nestedValue.trim() !== '' && Number.isFinite(Number(nestedValue))) return Math.max(0, Number(nestedValue));
+    }
+  }
+  return 0;
+};
+
 export async function fetchEcoTrackProducts(settings?: EcoTrackSettings) {
   ensureToken(settings);
   const response = await fetch(`${getBaseUrl(settings)}/get/products/list`, { headers: getHeaders(settings) });
@@ -123,7 +150,7 @@ export async function fetchEcoTrackProducts(settings?: EcoTrackSettings) {
     id: String(item.id ?? item.product_id ?? item.productId ?? item.code ?? item.reference ?? item.ref ?? ''),
     name: String(item.name ?? item.nom ?? item.product_name ?? item.productName ?? item.produit ?? item.title ?? ''),
     reference: item.reference ?? item.ref ?? item.sku ?? item.product_reference ? String(item.reference ?? item.ref ?? item.sku ?? item.product_reference) : null,
-    quantity: Math.max(0, Number(item.quantity ?? item.quantite ?? item.stock ?? item.qty ?? item.available_quantity ?? item.available ?? 0) || 0),
+    quantity: quantityFrom(item),
     active: item.active !== false && item.is_active !== false && item.status !== false && item.deleted !== true,
   })).filter((item) => item.id && item.name && item.active);
 }
