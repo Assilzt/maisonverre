@@ -151,7 +151,8 @@ export function getProductEventData(
     content_ids: [product.tracking.contentId],
     content_type: "product",
     value: price,
-    currency: product.currency,
+    // Meta Pixel expects an ISO 4217 code; keep product.currency (دج) for display only.
+    currency: "DZD",
   };
 }
 
