@@ -53,6 +53,8 @@ The root URL `/` continues to show the default product. An unknown product slug 
 
 The optional `bundles` list describes package quantities and their total prices. The `/ecom12` presentation shows those choices and uses the selected total for order, lead, notification, and Pixel values; the standard `/` presentation keeps its existing single-product price display.
 
+The Meta Pixel ID is managed from **Dashboard → إعدادات المتجر → معرّف Meta Pixel**. The storefront fetches only this public numeric ID from the API; changing it affects product-page visits after reload. Leave the field empty to disable Pixel tracking.
+
 ## Required checks before publishing
 
 Run `pnpm check`, `pnpm test`, and `pnpm build`. Verify the new product on a mobile viewport, including the Wilaya and commune selectors, delivery type, price calculation, order submission, and Facebook event content. Images should be optimized WebP files and their paths must be committed or replaced with the project's approved storage paths.

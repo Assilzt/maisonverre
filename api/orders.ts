@@ -180,6 +180,7 @@ const ensureSchema = async () => {
       await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('delivery_fees', '{}') ON CONFLICT (key) DO NOTHING`;
       await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('shipping_providers', '[]') ON CONFLICT (key) DO NOTHING`;
       await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('active_provider_id', '') ON CONFLICT (key) DO NOTHING`;
+      await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('meta_pixel_id', '837444182648161') ON CONFLICT (key) DO NOTHING`;
     })();
   }
   await schemaReady;
@@ -215,6 +216,11 @@ const isCron = (request: Request) =>
 const queryValue = (request: Request, name: string) => {
   const value = request.query?.[name];
   return Array.isArray(value) ? value[0] : value;
+};
+
+const loadMetaPixelId = async () => {
+  const rows = (await sql!`SELECT value FROM atlasio_settings WHERE key = 'meta_pixel_id' LIMIT 1`) as Array<{ value: string }>;
+  return String(rows[0]?.value || '').trim();
 };
 
 const loadEcoSettings = async (providerId?: string) => {
@@ -425,6 +431,10 @@ export default async function handler(request: Request, response: Response) {
 
     if (request.method === "GET") {
       const resource = queryValue(request, "resource");
+      if (resource === "pixel-config") {
+        response.status(200).json({ pixelId: await loadMetaPixelId() });
+        return;
+      }
       const ecoSettings = await loadEcoSettings();
       if (resource === "settings") {
         if (!isAdmin(request)) {
@@ -438,6 +448,7 @@ export default async function handler(request: Request, response: Response) {
           providers: publicProviders(ecoSettings.providers),
           tokenConfigured: Boolean(ecoSettings.token),
           deliveryFees: ecoSettings.deliveryFees,
+          pixelId: await loadMetaPixelId(),
         });
         return;
       }
@@ -958,6 +969,15 @@ export default async function handler(request: Request, response: Response) {
       }
 
       if (body.resource === "settings") {
+        const hasPixelId = Object.prototype.hasOwnProperty.call(body, "pixelId");
+        if (hasPixelId) {
+          const pixelId = String(body.pixelId || "").trim();
+          if (pixelId && !/^\d{8,20}$/.test(pixelId)) {
+            response.status(400).json({ error: "معرّف Meta Pixel يجب أن يتكون من 8 إلى 20 رقماً" });
+            return;
+          }
+          await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('meta_pixel_id', ${pixelId}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+        }
         if (Array.isArray(body.providers)) {
           const existingProviders = (await loadEcoSettings()).providers;
           const providers = body.providers
@@ -991,7 +1011,7 @@ export default async function handler(request: Request, response: Response) {
             body.activeProviderId || providers[0]?.id || ""
           );
           await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('active_provider_id', ${activeProviderId}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
-        } else {
+        } else if (!hasPixelId) {
           const provider = String(body.provider || "")
             .trim()
             .toLowerCase()
@@ -1025,6 +1045,7 @@ export default async function handler(request: Request, response: Response) {
           providers: publicProviders(currentSettings.providers),
           tokenConfigured: Boolean(currentSettings.token),
           deliveryFees: currentSettings.deliveryFees,
+          pixelId: await loadMetaPixelId(),
         });
         return;
       }

@@ -2,6 +2,7 @@ import { useState, FormEvent, useEffect, useRef } from 'react';
 import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { Label } from '@/react-app/components/ui/label';
+import { trackMetaPixelEvent, trackMetaPixelEventOnce } from '@/react-app/lib/meta-pixel';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import {
   DEFAULT_PRODUCT,
@@ -130,8 +131,7 @@ const saveOrder = async (payload: {
 };
 
 const fireFacebookEvent = (eventName: string, parameters: Record<string, unknown> = {}) => {
-  const fbq = (window as Window & { fbq?: (...args: unknown[]) => void }).fbq;
-  if (typeof fbq === 'function') fbq('track', eventName, parameters);
+  trackMetaPixelEvent(eventName, parameters);
 };
 
 const fireFacebookEventOnce = (
@@ -140,16 +140,11 @@ const fireFacebookEventOnce = (
   dedupeKey: string,
   parameters: Record<string, unknown> = {},
 ) => {
-  const fbq = (window as Window & { fbq?: (...args: unknown[]) => void }).fbq;
-  if (typeof fbq !== 'function') return;
-  const storageKey = getPixelStorageKey(product, dedupeKey);
-  try {
-    if (window.sessionStorage.getItem(storageKey)) return;
-    window.sessionStorage.setItem(storageKey, '1');
-  } catch {
-    // Tracking must never block the order flow if storage is unavailable.
-  }
-  fbq('track', eventName, parameters);
+  trackMetaPixelEventOnce(
+    getPixelStorageKey(product, dedupeKey),
+    eventName,
+    parameters,
+  );
 };
 
 function ImageSlider({ images, compact = false }: { images: ProductLandingConfig['images']; compact?: boolean }) {

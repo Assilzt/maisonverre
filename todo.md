@@ -17,3 +17,11 @@
 - [x] Add the 1 / 2 / 3 box price selector at 1990 / 2990 / 3500 DZD on `/ecom12` only.
 - [x] Ensure selected bundle price and label are reflected in total, order, lead, notification, and Pixel value.
 - [x] Verify the original homepage still shows its existing price and rerun checks/build.
+
+
+# Dashboard-managed Meta Pixel ID
+- [x] Store a validated Pixel ID in the existing admin settings table, preserving the current ID for existing deployments.
+- [x] Expose only the public Pixel ID to storefront clients; keep changes admin-authenticated.
+- [x] Add an RTL dashboard field, save feedback, and input validation.
+- [x] Load PageView and queued events from the currently saved ID; remove the hardcoded ID from static HTML.
+- [x] Add regression coverage and run type-check, tests, and production build.

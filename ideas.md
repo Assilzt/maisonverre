@@ -78,3 +78,10 @@ Example lines:
 - Adapt that visual grammar to Maisonverre's existing white-strawberry product content, image assets, form, and current delivery/trust details. Do not copy Ecom12 markup, scripts, copy that asserts unsupported claims, or business logic.
 - Keep the alternate route in RTL and scope all visual overrides to a route-specific wrapper so the homepage and dashboard styles are unaffected.
 - Keep the existing shared React state, order/lead API calls, offer behavior, delivery fee lookups, Telegram notification flow, and deduplicated Facebook Pixel events intact.
+
+
+## Admin Setting: Meta Pixel ID
+- Add an editable Pixel ID field in the dashboard settings modal alongside shipping configuration.
+- Persist it in the existing admin-only settings store; validate digits and return only the public numeric ID to storefront initialization.
+- Keep the initial saved value equal to the currently embedded ID so current tracking remains intact after deploy.
+- Initialize PageView and flush queued storefront events only after the configured ID loads; do not embed the ID in static HTML.

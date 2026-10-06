@@ -36,4 +36,20 @@ describe('Atlasio security and workflow baseline', () => {
     expect(product).toContain('{ quantity: 2, price: 2990, label: "علبتان" }');
     expect(product).toContain('{ quantity: 3, price: 3500, label: "3 علب" }');
   });
+
+  it('stores the Meta Pixel ID behind dashboard authentication and initializes it from saved settings', async () => {
+    const orders = await readFile(new URL('../api/orders.ts', import.meta.url), 'utf8');
+    const dashboard = await readFile(new URL('./src/react-app/pages/Dashboard.tsx', import.meta.url), 'utf8');
+    const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+    const pixel = await readFile(new URL('./src/react-app/lib/meta-pixel.ts', import.meta.url), 'utf8');
+    expect(orders).toContain("'meta_pixel_id', '837444182648161'");
+    expect(orders).toContain('resource === "pixel-config"');
+    expect(orders).toContain('body.pixelId');
+    expect(orders).toContain('!/^\\d{8,20}$/.test(pixelId)');
+    expect(dashboard).toContain('معرّف Meta Pixel');
+    expect(dashboard).toContain('حفظ معرّف Pixel');
+    expect(pixel).toContain('resource=pixel-config');
+    expect(pixel).toContain('"PageView"');
+    expect(html).not.toContain('837444182648161');
+  });
 });

@@ -254,6 +254,12 @@ export default function Dashboard() {
     message: string;
   } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pixelIdDraft, setPixelIdDraft] = useState("");
+  const [savingPixelId, setSavingPixelId] = useState(false);
+  const [pixelNotice, setPixelNotice] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [provider, setProvider] = useState("navexdelivery");
   const [token, setToken] = useState("");
   const [tokenConfigured, setTokenConfigured] = useState(false);
@@ -374,6 +380,7 @@ export default function Dashboard() {
     });
     if (!response.ok) return;
     const data = await response.json();
+    setPixelIdDraft(data.pixelId || "");
     setProvider(data.provider || "navexdelivery");
     setTokenConfigured(Boolean(data.tokenConfigured));
     setFeeText(JSON.stringify(data.deliveryFees || {}, null, 2));
@@ -528,6 +535,45 @@ export default function Dashboard() {
     setSelectedProviderId(item.id);
     setTokenConfigured(Boolean(item.tokenConfigured));
     void refreshStock(item.id);
+  };
+
+  const savePixelId = async () => {
+    const pixelId = pixelIdDraft.trim();
+    if (pixelId && !/^\d{8,20}$/.test(pixelId)) {
+      setPixelNotice({
+        type: "error",
+        message: "أدخل معرّف Pixel مكوّناً من 8 إلى 20 رقماً، أو اتركه فارغاً للتعطيل.",
+      });
+      return;
+    }
+    setSavingPixelId(true);
+    setPixelNotice(null);
+    try {
+      const response = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ resource: "settings", pixelId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "تعذر حفظ معرّف Pixel");
+      setPixelIdDraft(data.pixelId || "");
+      setPixelNotice({
+        type: "success",
+        message: pixelId
+          ? "تم الحفظ. سيُستخدم المعرّف الجديد عند إعادة تحميل صفحة المتجر."
+          : "تم تعطيل Meta Pixel للزيارات الجديدة.",
+      });
+    } catch (requestError) {
+      setPixelNotice({
+        type: "error",
+        message:
+          requestError instanceof Error
+            ? requestError.message
+            : "تعذر حفظ معرّف Pixel",
+      });
+    } finally {
+      setSavingPixelId(false);
+    }
   };
 
   const saveSettings = async (event: FormEvent) => {
@@ -2154,7 +2200,7 @@ export default function Dashboard() {
           className="mt-6 flex w-full items-center justify-between rounded-2xl bg-slate-950 p-4 text-right text-sm font-black text-white shadow-lg shadow-slate-950/10 transition hover:bg-emerald-700"
         >
           <span className="flex items-center gap-3">
-            <Settings className="h-5 w-5" /> إعدادات شركات الشحن
+            <Settings className="h-5 w-5" /> إعدادات المتجر
           </span>
           <ChevronDown className="h-4 w-4 rotate-90" />
         </button>
@@ -2170,14 +2216,14 @@ export default function Dashboard() {
           >
             <div className="mb-6 flex items-start justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-[.2em] text-emerald-600">
-                  ATLASIO / SHIPPING
+            <p className="text-xs font-black uppercase tracking-[.2em] text-emerald-600">
+                  ATLASIO / SETTINGS
                 </p>
                 <h2 className="mt-1 text-2xl font-black text-slate-950">
-                  شركات التوصيل
+                  إعدادات المتجر
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  اختر شركة لعرض بياناتها وتعديل التوكن ومراجعة مخزونها.
+                  إدارة معرّف Meta Pixel وشركات التوصيل ومخزون الشحن.
                 </p>
               </div>
               <button
@@ -2196,6 +2242,46 @@ export default function Dashboard() {
                 </button>
               </div>
             )}
+            <div className="mb-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-black text-slate-950">معرّف Meta Pixel</h3>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                    يُستخدم لربط زيارات المتجر وأحداث الطلبات بحساب Meta. التغيير يُطبّق عند إعادة تحميل صفحة المتجر.
+                  </p>
+                </div>
+                <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700">Meta</span>
+              </div>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <label className="flex-1 text-xs font-black text-slate-500">
+                  Pixel ID
+                  <input
+                    value={pixelIdDraft}
+                    onChange={event => setPixelIdDraft(event.target.value)}
+                    inputMode="numeric"
+                    maxLength={20}
+                    placeholder="مثال: 837444182648161"
+                    dir="ltr"
+                    aria-label="معرّف Meta Pixel"
+                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left text-sm font-bold tracking-wide outline-none focus:border-blue-400 focus:bg-white"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void savePixelId()}
+                  disabled={savingPixelId}
+                  className="self-end rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-60"
+                >
+                  {savingPixelId ? "جارٍ الحفظ..." : "حفظ معرّف Pixel"}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-slate-400">يجب أن يكون المعرّف أرقاماً فقط. اتركه فارغاً إذا أردت إيقاف التتبع.</p>
+              {pixelNotice && (
+                <p className={`mt-3 rounded-xl px-3 py-2 text-sm font-bold ${pixelNotice.type === "success" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`} role="status">
+                  {pixelNotice.message}
+                </p>
+              )}
+            </div>
             <div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
               <div>
                 <div className="mb-3 flex items-center justify-between">
