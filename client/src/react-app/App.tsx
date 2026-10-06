@@ -41,6 +41,7 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/" element={isDashboard ? <Dashboard /> : <HomePage />} />
+        <Route path="/ecom12" element={<HomePage design="ecom12" />} />
         <Route path="/p/:slug" element={<ProductLandingRoute />} />
       </Routes>
     </Router>

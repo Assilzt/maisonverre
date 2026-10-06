@@ -12,6 +12,12 @@ export type ProductFeature = {
   area: string;
 };
 
+export type ProductBundle = {
+  quantity: number;
+  price: number;
+  label: string;
+};
+
 export type ProductLandingConfig = {
   slug: string;
   name: string;
@@ -21,6 +27,7 @@ export type ProductLandingConfig = {
   description: string;
   price: number;
   compareAtPrice?: number;
+  bundles?: ProductBundle[];
   currency: string;
   images: ProductImage[];
   features: ProductFeature[];
@@ -56,6 +63,11 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
       "اختَر الولاية والبلدية، وسنتصل بك قبل الشحن لتأكيد الطلب والتوصيل.",
     price: 1900,
     compareAtPrice: 2700,
+    bundles: [
+      { quantity: 1, price: 1990, label: "علبة واحدة" },
+      { quantity: 2, price: 2990, label: "علبتان" },
+      { quantity: 3, price: 3500, label: "3 علب" },
+    ],
     currency: "دج",
     images: [
       {

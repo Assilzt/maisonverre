@@ -69,3 +69,12 @@ Example lines:
 - اعتماد اتجاه «حديقة سوقية دافئة» دون إدخال تدرجات بنفسجية أو مظهر تقني بارد.
 - الإبقاء على اللغة العربية واتجاه RTL كجزء من هوية المنتج، وليس كترجمة ثانوية.
 - استخدام الأصول الأصلية إن وُجدت، وتجنب إضافة صور زخرفية مكررة إلى مناطق متعددة.
+
+
+## Alternate Route: `/ecom12` — Ecom12-Inspired First View
+
+- Keep `/` on the current Maisonverre design; the alternate treatment is only rendered at `/ecom12`.
+- Borrow the reference page's compact mobile-first hierarchy: black announcement ribbon, prominent product imagery, direct order CTA, concise trust/benefit row, and a clearly framed order form.
+- Adapt that visual grammar to Maisonverre's existing white-strawberry product content, image assets, form, and current delivery/trust details. Do not copy Ecom12 markup, scripts, copy that asserts unsupported claims, or business logic.
+- Keep the alternate route in RTL and scope all visual overrides to a route-specific wrapper so the homepage and dashboard styles are unaffected.
+- Keep the existing shared React state, order/lead API calls, offer behavior, delivery fee lookups, Telegram notification flow, and deduplicated Facebook Pixel events intact.

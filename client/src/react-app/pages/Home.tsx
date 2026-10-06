@@ -182,7 +182,7 @@ function ImageSlider({ images, compact = false }: { images: ProductLandingConfig
 }
 
 
-export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductLandingConfig }) {
+export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: { product?: ProductLandingConfig; design?: 'default' | 'ecom12' }) {
   const [fullName, setFullName] = useState('');
   const [wilaya, setWilaya] = useState('');
   const [commune, setCommune] = useState('');
@@ -192,8 +192,9 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
   const [deliveryType, setDeliveryType] = useState<'home' | 'stop_desk'>('home');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [selectedBundleQuantity, setSelectedBundleQuantity] = useState(1);
   const searchParams = new URLSearchParams(window.location.search);
-  const isLimitedOffer = product.limitedOffer?.enabled === true && searchParams.get('offer') === 'limited';
+  const isLimitedOffer = design !== 'ecom12' && product.limitedOffer?.enabled === true && searchParams.get('offer') === 'limited';
   const [limitedOfferEndsAt] = useState(() => getOfferEndsAt(product, 'limited', isLimitedOffer));
   const [giftOfferEndsAt] = useState(() => getOfferEndsAt(product, 'gift', product.gift?.enabled === true));
   const [giftBookletSelected, setGiftBookletSelected] = useState(false);
@@ -204,7 +205,13 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
   const facebookLeadSentRef = useRef(false);
   const limitedOfferActive = Boolean(limitedOfferEndsAt && currentTime < limitedOfferEndsAt);
   const giftOfferActive = Boolean(giftOfferEndsAt && currentTime < giftOfferEndsAt);
-  const offerPrice = isLimitedOffer && !limitedOfferActive ? product.compareAtPrice || product.price : getProductOfferPrice(product, searchParams, isLimitedOffer);
+  const baseOfferPrice = isLimitedOffer && !limitedOfferActive ? product.compareAtPrice || product.price : getProductOfferPrice(product, searchParams, isLimitedOffer);
+  const selectedBundle = product.bundles?.find((bundle) => bundle.quantity === selectedBundleQuantity) || product.bundles?.[0];
+  const offerPrice = design === 'ecom12' && selectedBundle ? selectedBundle.price : baseOfferPrice;
+  const compareAtTotal = product.compareAtPrice ? product.compareAtPrice * (design === 'ecom12' ? selectedBundle?.quantity || 1 : 1) : undefined;
+  const campaignLabel = design === 'ecom12' && selectedBundle
+    ? `${product.tracking.campaignName} - ${selectedBundle.label}`
+    : getProductCampaignLabel(product, offerPrice, isLimitedOffer);
   const productEventData = getProductEventData(product, offerPrice);
   const initiateCheckoutSentRef = useRef(false);
 
@@ -372,13 +379,13 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
       leadId,
       status: 'abandoned',
       price: offerPrice,
-      campaign: getProductCampaignLabel(product, offerPrice, isLimitedOffer),
+      campaign: campaignLabel,
       phone: trimmedPhone,
       deliveryFee,
       deliveryType,
       giftBooklet: giftBookletSelected && giftOfferActive,
     });
-    const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getProductCampaignLabel(product, offerPrice, isLimitedOffer)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee || 'يحدد بعد اختيار الولاية'} دج\n📞 الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
+    const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${campaignLabel}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee || 'يحدد بعد اختيار الولاية'} دج\n📞 الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
 
     void fetch('/api/telegram', {
       method: 'POST',
@@ -415,12 +422,12 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
 
     const trimmedPhone = phone.trim();
     const leadId = getProductLeadId(product, trimmedPhone);
-    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${getProductCampaignLabel(product, offerPrice, isLimitedOffer)}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
+    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${campaignLabel}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
     const orderSaved = await saveOrder({
       leadId,
       status: 'complete',
       price: offerPrice,
-      campaign: getProductCampaignLabel(product, offerPrice, isLimitedOffer),
+      campaign: campaignLabel,
       phone: trimmedPhone,
       fullName,
       wilaya,
@@ -480,14 +487,20 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className={`min-h-screen relative overflow-hidden ${design === 'ecom12' ? 'ecom12-landing' : ''}`}>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(236,253,245,0.95),_transparent_52%),linear-gradient(135deg,_#fff7ed_0%,_#fdf2f8_48%,_#ecfdf5_100%)]">
         <div className="absolute inset-0 bg-white/70 backdrop-blur-sm"></div>
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
-        <div className="grid md:grid-cols-2 gap-8 items-start">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100">
+      {design === 'ecom12' && (
+        <div className="ecom12-announcement" role="note" dir="rtl">
+          <span>بذور الفراولة البيضاء</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span>
+        </div>
+      )}
+
+      <div className={`relative z-10 container mx-auto px-4 py-8 max-w-6xl ${design === 'ecom12' ? 'ecom12-content' : ''}`}>
+        <div className={`grid md:grid-cols-2 gap-8 items-start ${design === 'ecom12' ? 'ecom12-layout' : ''}`}>
+          <div className={`bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100 ${design === 'ecom12' ? 'ecom12-copy-card' : ''}`}>
             <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-gray-800" dir="rtl">
               {product.headline} 🌸
             </h1>
@@ -498,6 +511,10 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
             <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
               {product.description}
             </p>
+
+            {design === 'ecom12' && (
+              <a className="ecom12-cta" href="#lead-form" dir="rtl">اطلب الآن — الدفع عند الاستلام</a>
+            )}
 
             {isLimitedOffer && (
               <div className={`mb-5 rounded-xl border p-3 text-center ${limitedOfferActive ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`} dir="rtl">
@@ -512,7 +529,7 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
               </div>
             )}
 
-            <div className="md:hidden mb-6 w-full">
+            <div className={`md:hidden mb-6 w-full ${design === 'ecom12' ? 'ecom12-mobile-image' : ''}`}>
               <ImageSlider images={product.images} compact />
             </div>
 
@@ -608,14 +625,31 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
                     </div>
                   </div>
 
+                {design === 'ecom12' && product.bundles && (
+                  <div className="ecom12-package-grid" dir="rtl" aria-label="اختر عدد العلب">
+                    {product.bundles.map((bundle) => (
+                      <button
+                        key={bundle.quantity}
+                        type="button"
+                        aria-pressed={selectedBundle?.quantity === bundle.quantity}
+                        onClick={() => setSelectedBundleQuantity(bundle.quantity)}
+                        className={`ecom12-package-option ${selectedBundle?.quantity === bundle.quantity ? 'selected' : ''}`}
+                      >
+                        <span className="ecom12-package-label">{bundle.label}</span>
+                        <span className="ecom12-package-price">{bundle.price} {product.currency}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
                   <p className="text-base font-semibold text-gray-800">
-                    سعر المنتج: <span className="text-xl font-extrabold text-emerald-700">{offerPrice} {product.currency}</span>
+                    {design === 'ecom12' ? 'سعر الباقة:' : 'سعر المنتج:'} <span className="text-xl font-extrabold text-emerald-700">{offerPrice} {product.currency}</span>
                   </p>
-                  {product.compareAtPrice && offerPrice < product.compareAtPrice && (
+                  {compareAtTotal && offerPrice < compareAtTotal && (
                     <p className="mt-1 text-xs font-semibold text-gray-500">
-                      <span className="line-through">{product.compareAtPrice} {product.currency}</span>
-                      <span className="mx-2 rounded-full bg-rose-100 px-2 py-1 text-rose-700">خصم {Math.round((((product.compareAtPrice || product.price) - offerPrice) / (product.compareAtPrice || product.price)) * 100)}%</span>
+                      <span className="line-through">{compareAtTotal} {product.currency}</span>
+                      <span className="mx-2 rounded-full bg-rose-100 px-2 py-1 text-rose-700">خصم {Math.round(((compareAtTotal - offerPrice) / compareAtTotal) * 100)}%</span>
                     </p>
                   )}
                 </div>
@@ -714,7 +748,7 @@ export default function Home({ product = DEFAULT_PRODUCT }: { product?: ProductL
             )}
           </div>
 
-          <div className="hidden md:flex justify-center items-start sticky top-8">
+          <div className={`hidden md:flex justify-center items-start sticky top-8 ${design === 'ecom12' ? 'ecom12-image-column' : ''}`}>
             <ImageSlider images={product.images} />
           </div>
         </div>

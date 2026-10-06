@@ -16,6 +16,10 @@ Add one `ProductLandingConfig` entry to `PRODUCT_CONFIGS`:
   description: 'وصف المنتج ودعوة العميل لإكمال الطلب.',
   price: 2500,
   compareAtPrice: 3200,
+  bundles: [
+    { quantity: 1, price: 2500, label: 'علبة واحدة' },
+    { quantity: 2, price: 4200, label: 'علبتان' },
+  ],
   currency: 'دج',
   images: [
     { src: '/images/new-product-main.webp', alt: 'وصف الصورة', label: 'المنتج' },
@@ -46,6 +50,8 @@ After adding the entry, the page is available automatically at:
 ```
 
 The root URL `/` continues to show the default product. An unknown product slug shows a safe not-found message instead of silently submitting an order against the wrong product.
+
+The optional `bundles` list describes package quantities and their total prices. The `/ecom12` presentation shows those choices and uses the selected total for order, lead, notification, and Pixel values; the standard `/` presentation keeps its existing single-product price display.
 
 ## Required checks before publishing
 
