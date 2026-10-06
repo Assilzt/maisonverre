@@ -46,12 +46,12 @@ export type ProductLandingConfig = {
 };
 
 export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
-  "spring-flower-pack": {
-    slug: "spring-flower-pack",
-    name: "باك الربيع الملكي",
-    shortName: "باك الربيع",
-    headline: "ازرع ربيعك بنفسك",
-    subheadline: "باك واحد، 4 أنواع زهور، وبداية سهلة لشرفة أجمل",
+  "white-strawberry-seeds": {
+    slug: "white-strawberry-seeds",
+    name: "بذور الفراولة البيضاء",
+    shortName: "فراولة بيضاء",
+    headline: "ازرع فراولتك البيضاء بنفسك",
+    subheadline: "بذور مميزة، زراعة منزلية سهلة، وثمار بيضاء بطعم حلو",
     description:
       "اختَر الولاية والبلدية، وسنتصل بك قبل الشحن لتأكيد الطلب والتوصيل.",
     price: 1900,
@@ -59,82 +59,67 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
     currency: "دج",
     images: [
       {
-        src: "/images/main-pack.webp",
-        alt: "باك الربيع الملكي مع أربعة أنواع من الزهور",
-        label: "الباك الرئيسي",
-      },
-      {
-        src: "/images/proof-seedling.webp",
-        alt: "شتلات صغيرة نامية في أصيص",
-        label: "بداية النمو",
-      },
-      {
-        src: "/images/proof-flower.webp",
-        alt: "زهور نامية في الحديقة",
-        label: "نتيجة الزراعة",
-      },
-      {
-        src: "/images/proof-pots.webp",
-        alt: "أصص زهور مزروعة في المنزل",
-        label: "مناسب للشرفة",
+        src: "/images/white-strawberry.png",
+        alt: "عبوة بذور الفراولة البيضاء",
+        label: "العبوة الرئيسية",
       },
     ],
     features: [
       {
-        name: "زينيا قزم F1",
-        emoji: "🌼",
+        name: "بذور فراولة بيضاء",
+        emoji: "🍓",
         accent: "bg-rose-100 text-rose-700",
-        details: "حوالي 15 بذرة",
+        details: "بذور مختارة",
         area: "حتى 1 م²",
       },
       {
-        name: "مارغريت",
-        emoji: "🌻",
+        name: "بداية سهلة",
+        emoji: "🌱",
         accent: "bg-amber-100 text-amber-700",
-        details: "حوالي 1900 بذرة",
+        details: "مناسبة للمبتدئين",
         area: "حتى 2 م²",
       },
       {
-        name: "كوزموس",
-        emoji: "🌸",
+        name: "زراعة منزلية",
+        emoji: "🏡",
         accent: "bg-pink-100 text-pink-700",
-        details: "حوالي 200 بذرة",
+        details: "للشرفة والحديقة",
         area: "حتى 6 م²",
       },
       {
-        name: "قتيفة (كوليوس)",
-        emoji: "🌿",
+        name: "ثمار مميزة",
+        emoji: "🍓",
         accent: "bg-emerald-100 text-emerald-700",
-        details: "حوالي 680 بذرة",
+        details: "لون أبيض وطعم حلو",
         area: "حتى 3 م²",
       },
     ],
     trustBadges: [
       "الدفع عند الاستلام",
       "نتصل قبل الشحن",
-      "4 أنواع متنوعة",
+      "بذور أصلية",
       "+100 طلبية بلا شكوى",
     ],
     resultEyebrow: "نتائج تختلف حسب العناية",
-    resultTitle: "بداية بسيطة، فرق واضح في شرفتك",
+    resultTitle: "بداية بسيطة، فراولة مميزة في منزلك",
     resultDescription:
-      "الزينيا والكوسموس والقتيفة محبة للدفء، والنتائج تختلف حسب النوع والموسم والعناية.",
+      "تحتاج الفراولة البيضاء إلى ضوء جيد وري منتظم، وتختلف النتائج حسب الموسم والعناية وظروف الزراعة.",
     gift: {
       enabled: true,
-      title: "دليل العناية بالزهور مجاناً",
+      title: "دليل زراعة الفراولة مجاناً",
       description: "يساعدك تنجح في الزراعة",
       valueLabel: "قيمته 300 دج",
       durationMinutes: 5,
     },
     limitedOffer: { enabled: true, durationMinutes: 10 },
     tracking: {
-      contentId: "atlasio-spring-pack",
-      campaignName: "باك الربيع الملكي",
+      contentId: "maisonverre-white-strawberry",
+      campaignName: "بذور الفراولة البيضاء",
     },
   },
 };
 
-export const DEFAULT_PRODUCT = PRODUCT_CONFIGS["spring-flower-pack"];
+export const DEFAULT_PRODUCT = PRODUCT_CONFIGS["white-strawberry-seeds"];
 
 export function getProductConfig(
   slug?: string
@@ -183,7 +168,7 @@ export function getProductOfferPrice(
 }
 
 export function getProductStoragePrefix(product: ProductLandingConfig): string {
-  return `atlasio:${product.slug}`;
+  return `maisonverre:${product.slug}`;
 }
 
 export function getOfferEndsAt(

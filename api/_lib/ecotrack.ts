@@ -376,7 +376,7 @@ export async function createEcoTrackParcel(
     commune: commune.name,
     code_wilaya: String(code),
     montant: String(Math.round(order.price + (order.deliveryFee || 0))),
-    produit: order.productName || "باك الربيع الملكي",
+    produit: order.productName || "بذور الفراولة البيضاء",
     type: "1",
     stop_desk: order.deliveryType === "stop_desk" ? "1" : "0",
     stock: order.shippingMode === "stock" ? "1" : "0",

@@ -1160,7 +1160,7 @@ export default async function handler(request: Request, response: Response) {
         }
 
         const productName =
-          selectedProduct?.sku || selectedProduct?.name || "باك الربيع الملكي";
+          selectedProduct?.sku || selectedProduct?.name || "بذور الفراولة البيضاء";
         const createParcel = useStock
           ? createEcoTrackStockParcel
           : createEcoTrackNonStockParcel;
@@ -1297,7 +1297,7 @@ export default async function handler(request: Request, response: Response) {
             const productName =
               selectedProduct?.sku ||
               selectedProduct?.name ||
-              "باك الربيع الملكي";
+              "بذور الفراولة البيضاء";
             const createParcel = useStock
               ? createEcoTrackStockParcel
               : createEcoTrackNonStockParcel;
