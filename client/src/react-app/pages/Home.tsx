@@ -162,7 +162,17 @@ function ImageSlider({ images, compact = false }: { images: ProductLandingConfig
 
   return (
     <div className={`relative overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl ${compact ? 'w-full' : 'w-full max-w-xl'}`} onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}>
-      <img src={activeSlide.src} alt={activeSlide.alt} className="aspect-[4/3] w-full object-cover" />
+      <img
+        src={activeSlide.src}
+        alt={activeSlide.alt}
+        width={1024}
+        height={1536}
+        loading="eager"
+        fetchPriority="high"
+        decoding="async"
+        sizes="(max-width: 767px) calc(100vw - 2rem), 50vw"
+        className="aspect-[4/3] w-full object-cover"
+      />
       <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-12 text-white" dir="rtl">
         <span className="text-sm font-bold">{activeSlide.label}</span>
         <span className="rounded-full bg-black/60 px-3 py-1 text-xs" dir="ltr">{activeIndex + 1} / {images.length}</span>
@@ -500,7 +510,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
 
       <div className={`relative z-10 container mx-auto px-4 py-8 max-w-6xl ${design === 'ecom12' ? 'ecom12-content' : ''}`}>
         <div className={`grid md:grid-cols-2 gap-8 items-start ${design === 'ecom12' ? 'ecom12-layout' : ''}`}>
-          <div className={`bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100 ${design === 'ecom12' ? 'ecom12-copy-card' : ''}`}>
+          <div className={`order-2 md:order-none bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100 ${design === 'ecom12' ? 'ecom12-copy-card' : ''}`}>
             <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-gray-800" dir="rtl">
               {product.headline} 🌸
             </h1>
@@ -528,10 +538,6 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                 )}
               </div>
             )}
-
-            <div className={`md:hidden mb-6 w-full ${design === 'ecom12' ? 'ecom12-mobile-image' : ''}`}>
-              <ImageSlider images={product.images} compact />
-            </div>
 
             {submitted ? (
               <div className="text-center py-8">
@@ -748,7 +754,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
             )}
           </div>
 
-          <div className={`hidden md:flex justify-center items-start sticky top-8 ${design === 'ecom12' ? 'ecom12-image-column' : ''}`}>
+          <div className={`order-1 md:order-none flex justify-center items-start sticky top-8 ${design === 'ecom12' ? 'ecom12-image-column' : ''}`}>
             <ImageSlider images={product.images} />
           </div>
         </div>

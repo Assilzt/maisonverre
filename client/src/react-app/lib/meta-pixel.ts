@@ -67,6 +67,7 @@ export const initializeMetaPixel = (): Promise<void> => {
 
   initialization = (async () => {
     try {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 1500));
       const response = await fetch("/api/orders?resource=pixel-config", { cache: "no-store" });
       if (!response.ok) throw new Error("Pixel configuration request failed");
       const data = (await response.json()) as { pixelId?: unknown };

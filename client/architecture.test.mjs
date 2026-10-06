@@ -21,7 +21,9 @@ describe('Atlasio security and workflow baseline', () => {
     const app = await readFile(new URL('./src/react-app/App.tsx', import.meta.url), 'utf8');
     const home = await readFile(new URL('./src/react-app/pages/Home.tsx', import.meta.url), 'utf8');
     const product = await readFile(new URL('./src/react-app/product-config.ts', import.meta.url), 'utf8');
-    expect(app).toContain('<Route path="/" element={isDashboard ? <Dashboard /> : <HomePage />} />');
+    expect(app).toContain('const Dashboard = lazy(() => import("@/react-app/pages/Dashboard"));');
+    expect(app).toContain('<Suspense fallback={<div className="min-h-screen bg-orange-50" />}>');
+    expect(app).not.toContain('import Dashboard from "@/react-app/pages/Dashboard";');
     expect(app).toContain('<Route path="/ecom12" element={<HomePage design="ecom12" />} />');
     expect(home).toContain("fetch('/api/orders'");
     expect(home).toContain("fetch('/api/telegram'");

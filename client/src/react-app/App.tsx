@@ -4,9 +4,11 @@ import {
   Route,
   useParams,
 } from "react-router";
+import { lazy, Suspense } from "react";
 import HomePage from "@/react-app/pages/Home";
-import Dashboard from "@/react-app/pages/Dashboard";
 import { getProductConfig } from "@/react-app/product-config";
+
+const Dashboard = lazy(() => import("@/react-app/pages/Dashboard"));
 
 function ProductLandingRoute() {
   const { slug } = useParams();
@@ -40,7 +42,18 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={isDashboard ? <Dashboard /> : <HomePage />} />
+        <Route
+          path="/"
+          element={
+            isDashboard ? (
+              <Suspense fallback={<div className="min-h-screen bg-orange-50" />}>
+                <Dashboard />
+              </Suspense>
+            ) : (
+              <HomePage />
+            )
+          }
+        />
         <Route path="/ecom12" element={<HomePage design="ecom12" />} />
         <Route path="/p/:slug" element={<ProductLandingRoute />} />
       </Routes>

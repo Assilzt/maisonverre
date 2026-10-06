@@ -71,7 +71,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
     currency: "دج",
     images: [
       {
-        src: "/images/white-strawberry.png",
+        src: "/images/white-strawberry.webp",
         alt: "عبوة بذور الفراولة البيضاء",
         label: "العبوة الرئيسية",
       },
