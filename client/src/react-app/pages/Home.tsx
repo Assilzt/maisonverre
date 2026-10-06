@@ -140,6 +140,8 @@ const fireFacebookEventOnce = (
   dedupeKey: string,
   parameters: Record<string, unknown> = {},
 ) => {
+  const fbq = (window as Window & { fbq?: (...args: unknown[]) => void }).fbq;
+  if (typeof fbq !== 'function') return;
   const storageKey = getPixelStorageKey(product, dedupeKey);
   try {
     if (window.sessionStorage.getItem(storageKey)) return;
@@ -147,7 +149,7 @@ const fireFacebookEventOnce = (
   } catch {
     // Tracking must never block the order flow if storage is unavailable.
   }
-  fireFacebookEvent(eventName, parameters);
+  fbq('track', eventName, parameters);
 };
 
 function ImageSlider({ images, compact = false }: { images: ProductLandingConfig['images']; compact?: boolean }) {
@@ -203,6 +205,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
   const hasAutoFocusedPhoneRef = useRef(false);
   const userInteractedRef = useRef(false);
   const facebookLeadSentRef = useRef(false);
+  const viewContentSentRef = useRef(false);
   const limitedOfferActive = Boolean(limitedOfferEndsAt && currentTime < limitedOfferEndsAt);
   const giftOfferActive = Boolean(giftOfferEndsAt && currentTime < giftOfferEndsAt);
   const baseOfferPrice = isLimitedOffer && !limitedOfferActive ? product.compareAtPrice || product.price : getProductOfferPrice(product, searchParams, isLimitedOffer);
@@ -306,7 +309,9 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
   }, []);
 
   useEffect(() => {
-    fireFacebookEventOnce(product, 'ViewContent', `view-content:${offerPrice}`, productEventData);
+    if (viewContentSentRef.current) return;
+    viewContentSentRef.current = true;
+    fireFacebookEvent('ViewContent', productEventData);
   }, []);
 
   const trackInitiateCheckout = () => {
@@ -438,7 +443,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
     });
 
     if (orderSaved) {
-      fireFacebookEventOnce(product, 'Purchase', `purchase:${offerPrice}:${trimmedPhone}`, productEventData);
+      fireFacebookEventOnce(product, 'Purchase', `purchase:${leadId}`, productEventData);
       setSubmitted(true);
       setFullName('');
       setWilaya('');

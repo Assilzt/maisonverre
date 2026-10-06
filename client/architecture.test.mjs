@@ -27,6 +27,9 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain("fetch('/api/telegram'");
     expect(home).toContain("fireFacebookEventOnce(product, 'Purchase'");
     expect(home).toContain("fireFacebookEventOnce(product, 'Lead'");
+    expect(home).toContain("fireFacebookEvent('ViewContent', productEventData)");
+    expect(home).toContain('`purchase:${leadId}`');
+    expect(home).not.toContain('`view-content:${offerPrice}`');
     expect(home).toContain('price: offerPrice');
     expect(home).toContain('campaign: campaignLabel');
     expect(product).toContain('{ quantity: 1, price: 1990, label: "علبة واحدة" }');
