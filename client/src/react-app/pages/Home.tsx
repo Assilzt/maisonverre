@@ -504,7 +504,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
 
       {design === 'ecom12' && (
         <div className="ecom12-announcement" role="note" dir="rtl">
-          <span>بذور الفراولة البيضاء</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span>
+          <span>فراولة بيضاء</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span>
         </div>
       )}
 
@@ -512,18 +512,18 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
         <div className={`grid md:grid-cols-2 gap-8 items-start ${design === 'ecom12' ? 'ecom12-layout' : ''}`}>
           <div className={`order-2 md:order-none bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100 ${design === 'ecom12' ? 'ecom12-copy-card' : ''}`}>
             <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-gray-800" dir="rtl">
-              {product.headline} 🌸
+              {design === 'ecom12' ? 'بذور فراولة بيضاء' : product.headline} 🌸
             </h1>
             <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm" dir="rtl">
-              <p className="text-base font-extrabold text-emerald-800">🌸 {product.subheadline}</p>
+              <p className="text-base font-extrabold text-emerald-800">🌸 {design === 'ecom12' ? 'زراعة سهلة. طعم حلو.' : product.subheadline}</p>
             </div>
 
             <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
-              {product.description}
+              {design === 'ecom12' ? 'اختر الولاية وأرسل الطلب.' : product.description}
             </p>
 
             {design === 'ecom12' && (
-              <a className="ecom12-cta" href="#lead-form" dir="rtl">اطلب الآن — الدفع عند الاستلام</a>
+              <a className="ecom12-cta" href="#lead-form" dir="rtl">اطلب الآن</a>
             )}
 
             {isLimitedOffer && (
@@ -641,7 +641,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                         onClick={() => setSelectedBundleQuantity(bundle.quantity)}
                         className={`ecom12-package-option ${selectedBundle?.quantity === bundle.quantity ? 'selected' : ''}`}
                       >
-                        <span className="ecom12-package-label">{bundle.label}</span>
+                        <span className="ecom12-package-label">{design === 'ecom12' ? `${bundle.quantity} علبة` : bundle.label}</span>
                         <span className="ecom12-package-price">{bundle.price} {product.currency}</span>
                       </button>
                     ))}
@@ -650,7 +650,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
 
                 <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
                   <p className="text-base font-semibold text-gray-800">
-                    {design === 'ecom12' ? 'سعر الباقة:' : 'سعر المنتج:'} <span className="text-xl font-extrabold text-emerald-700">{offerPrice} {product.currency}</span>
+                    {design === 'ecom12' ? 'السعر:' : 'سعر المنتج:'} <span className="text-xl font-extrabold text-emerald-700">{offerPrice} {product.currency}</span>
                   </p>
                   {compareAtTotal && offerPrice < compareAtTotal && (
                     <p className="mt-1 text-xs font-semibold text-gray-500">
@@ -660,7 +660,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                   )}
                 </div>
 
-                {giftOfferActive && (
+                {design !== 'ecom12' && giftOfferActive && (
                   <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2" dir="rtl">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-right">
@@ -673,17 +673,19 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4" dir="rtl">
-                  {product.trustBadges.map((badge, index) => (
-                    <div key={`${badge}-${index}`} className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-2 py-2">
-                      <p className="text-[11px] font-bold text-emerald-800">{badge}</p>
-                    </div>
-                  ))}
-                </div>
+                {design !== 'ecom12' && (
+                  <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4" dir="rtl">
+                    {product.trustBadges.map((badge, index) => (
+                      <div key={`${badge}-${index}`} className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-2 py-2">
+                        <p className="text-[11px] font-bold text-emerald-800">{badge}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {wilaya && (
                   <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4" dir="rtl">
-                    <p className="text-sm font-bold text-gray-800">اختر طريقة التوصيل</p>
+                    <p className="text-sm font-bold text-gray-800">التوصيل</p>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <label className={`cursor-pointer rounded-lg border p-3 ${deliveryType === 'home' ? 'border-emerald-500 bg-white' : 'border-amber-100 bg-transparent'}`}>
                         <input className="sr-only" type="radio" checked={deliveryType === 'home'} onChange={() => setDeliveryType('home')} />
@@ -696,7 +698,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                         <span className="mt-1 block text-xs text-gray-600">{canUseStopDesk && selectedFee.stopDesk ? `${selectedFee.stopDesk} دج` : 'غير متاح لهذه البلدية'}</span>
                       </label>
                     </div>
-                    <p className="text-xs font-medium text-amber-800">التوصيل منفصل عن سعر الباك، ويُحسب حسب الولاية وشركة التوصيل.</p>
+                    <p className="text-xs font-medium text-amber-800">حسب الولاية</p>
                     {deliveryFee > 0 && <p className="text-sm font-bold text-gray-900">المجموع التقريبي: {offerPrice + deliveryFee} دج</p>}
                   </div>
                 )}
@@ -716,7 +718,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                   )}
                 </Button>
 
-                <div className="mt-4 overflow-hidden rounded-2xl border border-pink-200 bg-gradient-to-br from-white via-pink-50/70 to-emerald-50/80 p-4 shadow-sm" dir="rtl">
+                {design !== 'ecom12' && <div className="mt-4 overflow-hidden rounded-2xl border border-pink-200 bg-gradient-to-br from-white via-pink-50/70 to-emerald-50/80 p-4 shadow-sm" dir="rtl">
                   <div className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm">
                     <p className="text-[15px] font-bold text-emerald-800">🌸 {product.resultTitle}</p>
                   </div>
@@ -744,11 +746,11 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                   </div>
 
                   <p className="mt-3 text-center text-[11px] leading-5 text-gray-500">قد يختلف العدد قليلاً حسب حجم البذور والدفعة.</p>
-                </div>
+                </div>}
 
-                <p className="text-center text-sm text-gray-600 mt-4" dir="rtl">
+                {design !== 'ecom12' && <p className="text-center text-sm text-gray-600 mt-4" dir="rtl">
                   الدفع عند الاستلام. سنتصل بك قبل الشحن لتأكيد الطلب والتوصيل.
-                </p>
+                </p>}
               </form>
             </div>
             )}
@@ -759,7 +761,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
           </div>
         </div>
 
-        <section className="mt-8 rounded-2xl bg-white/90 p-5 shadow-lg md:p-6" dir="rtl">
+        {design !== 'ecom12' && <section className="mt-8 rounded-2xl bg-white/90 p-5 shadow-lg md:p-6" dir="rtl">
           <div className="flex flex-col gap-3 text-center sm:flex-row sm:items-center sm:justify-between sm:text-right">
             <div>
               <p className="text-sm font-semibold text-pink-600">{product.resultEyebrow}</p>
@@ -767,7 +769,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
             </div>
             <p className="text-sm leading-6 text-gray-600">{product.resultDescription}</p>
           </div>
-        </section>
+        </section>}
       </div>
     </div>
   );
