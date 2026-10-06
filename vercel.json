@@ -3,10 +3,10 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist/public",
   "framework": "vite",
-  "crons": [
+  "rewrites": [
     {
-      "path": "/api/orders?resource=sync",
-      "schedule": "*/15 * * * *"
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ]
 }
