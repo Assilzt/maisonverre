@@ -348,3 +348,315 @@
     transition: none;
   }
 }
+
+/* Ecom12 reference visual layer: scoped to /ecom12 only. */
+.ecom12-landing {
+  min-height: 100vh;
+  background: #fff !important;
+  color: #0a0a0a;
+  font-family: "Cairo", system-ui, sans-serif;
+}
+
+.ecom12-landing > .absolute.inset-0 {
+  display: none !important;
+}
+
+.ecom12-announcement {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  min-height: 42px;
+  padding: 10px 16px;
+  background: #0a0a0a !important;
+  border-bottom: 1px solid #333;
+  color: #fff !important;
+  font-size: .85rem;
+  font-weight: 800;
+  letter-spacing: .2px;
+}
+
+.ecom12-announcement span:nth-child(2) {
+  color: #888 !important;
+}
+
+.ecom12-content {
+  width: 100%;
+  max-width: 540px !important;
+  margin: 0 auto;
+  padding: 10px 16px 40px !important;
+}
+
+.ecom12-layout {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  align-items: stretch !important;
+}
+
+.ecom12-copy-card {
+  display: contents !important;
+}
+
+.ecom12-copy-card > h1 {
+  order: 2 !important;
+  width: 100%;
+  margin: 8px 0 0 !important;
+  color: #0a0a0a !important;
+  font-size: clamp(1.5rem, 5vw, 2rem) !important;
+  font-weight: 900 !important;
+  letter-spacing: -.5px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.ecom12-copy-card > h1 + div {
+  order: 3 !important;
+  width: 100%;
+  margin: 4px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #888 !important;
+}
+
+.ecom12-copy-card > h1 + div p {
+  color: #888 !important;
+  font-size: .85rem !important;
+  font-weight: 600 !important;
+}
+
+.ecom12-copy-card > p {
+  order: 4 !important;
+  width: 100%;
+  margin: 4px 0 0 !important;
+  color: #888 !important;
+  font-size: .8rem !important;
+  text-align: center;
+}
+
+.ecom12-cta {
+  order: 5;
+  display: flex;
+  width: 100%;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 0 20px;
+  padding: 14px 20px;
+  border: 2px solid #0a0a0a !important;
+  border-radius: 14px !important;
+  background: #0a0a0a !important;
+  color: #fff !important;
+  font-size: 1.1rem;
+  font-weight: 900;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgb(10 10 10 / 16%);
+}
+
+.ecom12-image-column {
+  order: 1 !important;
+  position: relative !important;
+  top: auto !important;
+  display: block !important;
+  width: 100%;
+  margin: 0 !important;
+  align-self: auto !important;
+}
+
+.ecom12-image-column > div {
+  overflow: visible !important;
+  width: 100%;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.ecom12-image-column img {
+  display: block;
+  width: 100%;
+  height: auto !important;
+  max-height: none;
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+  background: transparent !important;
+}
+
+.ecom12-image-column > div > div:first-of-type {
+  display: none !important;
+}
+
+.ecom12-image-column > div > button {
+  display: none !important;
+}
+
+.ecom12-image-column > div > div:last-of-type {
+  bottom: 0;
+  background: transparent !important;
+}
+
+.ecom12-features-grid {
+  order: 6;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  margin: 0 0 20px;
+}
+
+.ecom12-feature-item {
+  display: flex;
+  min-height: 82px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 10px;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
+  background: #fff;
+  text-align: center;
+}
+
+.ecom12-feature-item span {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.ecom12-feature-item strong {
+  color: #0a0a0a;
+  font-size: .82rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.ecom12-copy-card > div:has(> form) {
+  order: 7 !important;
+  width: 100%;
+  margin: 0 !important;
+  padding: 24px 20px !important;
+  border: 2px solid #0a0a0a !important;
+  border-radius: 20px !important;
+  background: #fff !important;
+  box-shadow: 0 4px 20px rgb(10 10 10 / 6%) !important;
+}
+
+.ecom12-order-header {
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e8e8e8;
+  text-align: center;
+}
+
+.ecom12-order-header h2 {
+  color: #0a0a0a;
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+
+.ecom12-copy-card form {
+  gap: 0 !important;
+}
+
+.ecom12-copy-card form > div {
+  margin-bottom: 16px !important;
+}
+
+.ecom12-copy-card form label {
+  color: #0a0a0a !important;
+  font-size: .88rem !important;
+  font-weight: 700 !important;
+}
+
+.ecom12-copy-card form input:not([type="radio"]),
+.ecom12-copy-card form select {
+  min-height: 50px;
+  border: 1.5px solid #e8e8e8 !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  color: #0a0a0a !important;
+  box-shadow: none !important;
+}
+
+.ecom12-copy-card form input:not([type="radio"]):focus,
+.ecom12-copy-card form select:focus {
+  border-color: #0a0a0a !important;
+  box-shadow: 0 0 0 3px rgb(10 10 10 / 8%) !important;
+}
+
+.ecom12-package-grid {
+  margin: 0 0 22px;
+  gap: 10px;
+}
+
+.ecom12-package-option {
+  min-height: 86px;
+  padding: 14px 8px;
+  border: 2px solid #e8e8e8;
+  border-radius: 14px;
+  background: #fff;
+  color: #0a0a0a;
+}
+
+.ecom12-package-option.selected {
+  border-color: #0a0a0a;
+  background: #0a0a0a;
+  color: #fff;
+}
+
+.ecom12-copy-card form > div:has(> p > span.text-xl) {
+  margin: 20px 0 16px !important;
+  border: 1px dashed #888 !important;
+  border-radius: 8px !important;
+  background: #f6f6f6 !important;
+}
+
+.ecom12-copy-card form button[type="submit"] {
+  min-height: 58px;
+  margin-top: 4px;
+  border: 2px solid #0a0a0a !important;
+  border-radius: 14px !important;
+  background: #0a0a0a !important;
+  box-shadow: none !important;
+  color: #fff !important;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.ecom12-copy-card form button[type="submit"]:hover {
+  background: #fff !important;
+  color: #0a0a0a !important;
+}
+
+@media (min-width: 768px) {
+  .ecom12-content {
+    max-width: 600px !important;
+  }
+}
+
+.ecom12-marquee-content {
+  display: inline-flex;
+  gap: 2rem;
+  min-width: max-content;
+  animation: ecom12-marquee 22s linear infinite;
+}
+
+.ecom12-marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.ecom12-marquee-item span:nth-child(2) {
+  color: #888;
+}
+
+@keyframes ecom12-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(50%); }
+}
+
+.ecom12-announcement:hover .ecom12-marquee-content {
+  animation-play-state: paused;
+}

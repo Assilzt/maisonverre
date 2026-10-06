@@ -504,7 +504,11 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
 
       {design === 'ecom12' && (
         <div className="ecom12-announcement" role="note" dir="rtl">
-          <span>فراولة بيضاء</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span>
+          <div className="ecom12-marquee-content">
+            <div className="ecom12-marquee-item"><span>فراولة بيضاء</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span></div>
+            <div className="ecom12-marquee-item" aria-hidden="true"><span>فراولة بيضاء</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span></div>
+            <div className="ecom12-marquee-item" aria-hidden="true"><span>فراولة بيضاء</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span></div>
+          </div>
         </div>
       )}
 
@@ -553,6 +557,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
               </div>
             ) : (
               <div className="rounded-3xl border border-pink-100 bg-white/95 p-4 shadow-[0_8px_30px_rgba(244,114,182,0.08)] ring-1 ring-white/60 md:p-6">
+                {design === 'ecom12' && <div className="ecom12-order-header" dir="rtl"><h2>استمارة الطلب</h2></div>}
                 <form id="lead-form" onSubmit={handleSubmit} onFocus={trackInitiateCheckout} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="flex items-center gap-2 text-base font-bold text-gray-800">
@@ -759,6 +764,13 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
           <div className={`order-1 md:order-none flex justify-center items-start sticky top-8 ${design === 'ecom12' ? 'ecom12-image-column' : ''}`}>
             <ImageSlider images={product.images} />
           </div>
+          {design === 'ecom12' && (
+            <div className="ecom12-features-grid" dir="rtl">
+              <div className="ecom12-feature-item"><span aria-hidden="true">🌿</span><strong>طبيعية 100%</strong></div>
+              <div className="ecom12-feature-item"><span aria-hidden="true">🌱</span><strong>زراعة منزلية</strong></div>
+              <div className="ecom12-feature-item"><span aria-hidden="true">📦</span><strong>توصيل مضمون</strong></div>
+            </div>
+          )}
         </div>
 
         {design !== 'ecom12' && <section className="mt-8 rounded-2xl bg-white/90 p-5 shadow-lg md:p-6" dir="rtl">
