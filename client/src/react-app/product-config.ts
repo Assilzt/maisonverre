@@ -55,12 +55,12 @@ export type ProductLandingConfig = {
 export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
   "white-strawberry-seeds": {
     slug: "white-strawberry-seeds",
-    name: "بذور الفراولة البيضاء",
-    shortName: "فراولة بيضاء",
-    headline: "ازرع فراولتك البيضاء بنفسك",
-    subheadline: "بذور مميزة، زراعة منزلية سهلة، وثمار بيضاء بطعم حلو",
+    name: "بذور الفراولة البيضاء الأناناسية",
+    shortName: "فراولة Pineberry",
+    headline: "اكتشف فراولة Pineberry البيضاء النادرة",
+    subheadline: "ثمار بيضاء مميزة بنكهة فراولة حلوة ولمسة أناناس خفيفة",
     description:
-      "اختَر الولاية والبلدية، وسنتصل بك قبل الشحن لتأكيد الطلب والتوصيل.",
+      "ازرع صنف Pineberry النادر في منزلك؛ فراولة بيضاء بطابع مميز ونكهة تذكّر قليلًا بالأناناس. اختَر الولاية والبلدية وسنتصل بك لتأكيد الطلب.",
     price: 1900,
     compareAtPrice: 2700,
     bundles: [
@@ -72,16 +72,16 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
     images: [
       {
         src: "/images/white-strawberry.webp",
-        alt: "عبوة بذور الفراولة البيضاء",
+        alt: "عبوة بذور الفراولة البيضاء الأناناسية Pineberry",
         label: "العبوة الرئيسية",
       },
     ],
     features: [
       {
-        name: "بذور فراولة بيضاء",
+        name: "Pineberry نادرة",
         emoji: "🍓",
         accent: "bg-rose-100 text-rose-700",
-        details: "بذور مختارة",
+        details: "صنف أبيض مميز",
         area: "حتى 1 م²",
       },
       {
@@ -99,10 +99,10 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
         area: "حتى 6 م²",
       },
       {
-        name: "ثمار مميزة",
+        name: "نكهة استثنائية",
         emoji: "🍓",
         accent: "bg-emerald-100 text-emerald-700",
-        details: "لون أبيض وطعم حلو",
+        details: "حلاوة الفراولة ولمسة أناناس",
         area: "حتى 3 م²",
       },
     ],
@@ -110,12 +110,12 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
       "الدفع عند الاستلام",
       "نتصل قبل الشحن",
       "بذور أصلية",
-      "+100 طلبية بلا شكوى",
+      "صنف Pineberry قليل الانتشار",
     ],
     resultEyebrow: "نتائج تختلف حسب العناية",
-    resultTitle: "بداية بسيطة، فراولة مميزة في منزلك",
+    resultTitle: "ازرع فراولة Pineberry البيضاء في منزلك",
     resultDescription:
-      "تحتاج الفراولة البيضاء إلى ضوء جيد وري منتظم، وتختلف النتائج حسب الموسم والعناية وظروف الزراعة.",
+      "تُعرف Pineberry بندرتها ولونها الأبيض المميز، ويصف كثيرون نكهتها بأنها فراولة حلوة مع لمسة أناناس خفيفة. تحتاج إلى ضوء جيد وري منتظم، وتختلف النتائج حسب الموسم والعناية وظروف الزراعة.",
     gift: {
       enabled: true,
       title: "دليل زراعة الفراولة مجاناً",
@@ -126,7 +126,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
     limitedOffer: { enabled: true, durationMinutes: 10 },
     tracking: {
       contentId: "maisonverre-white-strawberry",
-      campaignName: "بذور الفراولة البيضاء",
+      campaignName: "بذور الفراولة البيضاء الأناناسية Pineberry",
     },
   },
 };

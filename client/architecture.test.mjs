@@ -29,7 +29,9 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain("fetch('/api/telegram'");
     expect(home).toContain("fireFacebookEventOnce(product, 'Purchase'");
     expect(home).toContain("fireFacebookEventOnce(product, 'Lead'");
-    expect(home).toContain("fireFacebookEvent('ViewContent', productEventData)");
+    expect(home).toContain("fireFacebookEventOnce(product, 'ViewContent', 'view-content', productEventData)");
+    expect(home).toContain("/^(0[567]\\d{8}|\\+213[567]\\d{8})$/");
+    expect(home.indexOf("fireFacebookEventOnce(product, 'Purchase'")).toBeLessThan(home.indexOf('const orderSaved = await saveOrder'));
     expect(home).toContain('`purchase:${leadId}`');
     expect(home).not.toContain('`view-content:${offerPrice}`');
     expect(home).toContain('price: offerPrice');
@@ -52,6 +54,8 @@ describe('Atlasio security and workflow baseline', () => {
     expect(dashboard).toContain('حفظ معرّف Pixel');
     expect(pixel).toContain('resource=pixel-config');
     expect(pixel).toContain('"PageView"');
+    expect(pixel).toContain('sessionStorage.getItem(storageKey)');
+    expect(pixel).toContain('sendPageViewOnce(pixelId)');
     expect(html).not.toContain('837444182648161');
   });
 });

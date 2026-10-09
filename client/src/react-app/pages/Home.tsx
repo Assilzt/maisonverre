@@ -2,7 +2,7 @@ import { useState, FormEvent, useEffect, useRef } from 'react';
 import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { Label } from '@/react-app/components/ui/label';
-import { trackMetaPixelEvent, trackMetaPixelEventOnce } from '@/react-app/lib/meta-pixel';
+import { trackMetaPixelEventOnce } from '@/react-app/lib/meta-pixel';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import {
   DEFAULT_PRODUCT,
@@ -88,7 +88,7 @@ const WILAYA_COMMUNES: Record<string, string[]> = {
   'تقرت': ['تقرت', 'الحارث', 'القرية', 'أولاد سعيد', 'بني شيح']
 };
 
-const PHONE_PATTERN = /^(0\d{9}|\+213\d{9})$/;
+const PHONE_PATTERN = /^(0[567]\d{8}|\+213[567]\d{8})$/;
 
 
 const validatePhone = (value: string): string => {
@@ -128,10 +128,6 @@ const saveOrder = async (payload: {
   } catch {
     return false;
   }
-};
-
-const fireFacebookEvent = (eventName: string, parameters: Record<string, unknown> = {}) => {
-  trackMetaPixelEvent(eventName, parameters);
 };
 
 const fireFacebookEventOnce = (
@@ -316,7 +312,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
   useEffect(() => {
     if (viewContentSentRef.current) return;
     viewContentSentRef.current = true;
-    fireFacebookEvent('ViewContent', productEventData);
+    fireFacebookEventOnce(product, 'ViewContent', 'view-content', productEventData);
   }, []);
 
   const trackInitiateCheckout = () => {
@@ -428,10 +424,11 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
     }
 
     trackInitiateCheckout();
-    setIsSubmitting(true);
-
     const trimmedPhone = phone.trim();
     const leadId = getProductLeadId(product, trimmedPhone);
+    fireFacebookEventOnce(product, 'Purchase', `purchase:${leadId}`, productEventData);
+    setIsSubmitting(true);
+
     const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${campaignLabel}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
     const orderSaved = await saveOrder({
       leadId,
@@ -448,7 +445,6 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
     });
 
     if (orderSaved) {
-      fireFacebookEventOnce(product, 'Purchase', `purchase:${leadId}`, productEventData);
       setSubmitted(true);
       setFullName('');
       setWilaya('');
@@ -505,9 +501,9 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
       {design === 'ecom12' && (
         <div className="ecom12-announcement" role="note" dir="rtl">
           <div className="ecom12-marquee-content">
-            <div className="ecom12-marquee-item"><span>فراولة بيضاء</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span></div>
-            <div className="ecom12-marquee-item" aria-hidden="true"><span>فراولة بيضاء</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span></div>
-            <div className="ecom12-marquee-item" aria-hidden="true"><span>فراولة بيضاء</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span></div>
+            <div className="ecom12-marquee-item"><span>Pineberry النادرة</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span></div>
+            <div className="ecom12-marquee-item" aria-hidden="true"><span>Pineberry النادرة</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span></div>
+            <div className="ecom12-marquee-item" aria-hidden="true"><span>Pineberry النادرة</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span></div>
           </div>
         </div>
       )}
@@ -516,14 +512,14 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
         <div className={`grid md:grid-cols-2 gap-8 items-start ${design === 'ecom12' ? 'ecom12-layout' : ''}`}>
           <div className={`order-2 md:order-none bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100 ${design === 'ecom12' ? 'ecom12-copy-card' : ''}`}>
             <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-gray-800" dir="rtl">
-              {design === 'ecom12' ? 'بذور فراولة بيضاء' : product.headline} 🌸
+              {design === 'ecom12' ? 'بذور الفراولة البيضاء الأناناسية | Pineberry' : product.headline} 🌸
             </h1>
             <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm" dir="rtl">
-              <p className="text-base font-extrabold text-emerald-800">🌸 {design === 'ecom12' ? 'زراعة سهلة. طعم حلو.' : product.subheadline}</p>
+              <p className="text-base font-extrabold text-emerald-800">🌸 {design === 'ecom12' ? 'صنف نادر بنكهة فراولة ولمسة أناناس خفيفة' : product.subheadline}</p>
             </div>
 
             <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
-              {design === 'ecom12' ? 'اختر الولاية وأرسل الطلب.' : product.description}
+              {design === 'ecom12' ? 'ازرع Pineberry المميزة: فراولة بيضاء قليلة الانتشار، بطابع حلو يذكّر قليلًا بالأناناس.' : product.description}
             </p>
 
             {design === 'ecom12' && (

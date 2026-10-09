@@ -25,6 +25,24 @@ let initialized = false;
 let disabled = false;
 let configuredPixelId = "";
 let initialization: Promise<void> | null = null;
+const pageViewSentForPixelIds = new Set<string>();
+
+const sendPageViewOnce = (pixelId: string) => {
+  const storageKey = `atlasio:meta-pixel:${pixelId}:page-view`;
+  try {
+    if (window.sessionStorage.getItem(storageKey)) {
+      pageViewSentForPixelIds.add(pixelId);
+      return;
+    }
+    window.sessionStorage.setItem(storageKey, "1");
+  } catch {
+    // Fall back to an in-memory guard if browser storage is unavailable.
+  }
+
+  if (pageViewSentForPixelIds.has(pixelId)) return;
+  pageViewSentForPixelIds.add(pixelId);
+  window.fbq?.("track", "PageView");
+};
 
 const installPixelStub = () => {
   if (window.fbq) return;
@@ -82,7 +100,7 @@ export const initializeMetaPixel = (): Promise<void> => {
       configuredPixelId = pixelId;
       installPixelStub();
       window.fbq?.("init", pixelId);
-      window.fbq?.("track", "PageView");
+      sendPageViewOnce(pixelId);
       initialized = true;
       for (const event of pendingEvents.splice(0)) sendEvent(event);
       pendingDedupeKeys.clear();
