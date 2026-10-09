@@ -523,7 +523,21 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
             </p>
 
             {design === 'ecom12' && (
-              <a className="ecom12-cta" href="#lead-form" dir="rtl">اطلب الآن</a>
+              <a
+                className="ecom12-cta"
+                href="#lead-form"
+                dir="rtl"
+                onClick={() =>
+                  fireFacebookEventOnce(
+                    product,
+                    'AddToCart',
+                    'ecom12-add-to-cart',
+                    productEventData,
+                  )
+                }
+              >
+                اطلب الآن
+              </a>
             )}
 
             {isLimitedOffer && (
