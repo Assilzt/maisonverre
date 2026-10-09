@@ -46,6 +46,15 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain('التوصيل المعتاد: يوم إلى يومين');
     expect(home).toContain('ضمان استبدال عند وجود مشكلة بالمنتج');
     expect(home).toContain('ولا يمكن ضمان إنبات كل بذرة');
+    expect(home).not.toContain('ازرع Pineberry المميزة: فراولة بيضاء قليلة الانتشار');
+    expect(home).not.toContain('إلى المكتب');
+    expect(home).not.toContain('المكتب');
+    expect(home).not.toContain('type="radio"');
+    expect(home).toContain("const deliveryType = 'home' as const");
+    expect(home).toContain('String(Number(rawWilayaCode))');
+    expect(home).toContain('الإجمالي النهائي: {offerPrice + deliveryFee}');
+    expect(home).toContain('التوصيل إلى المنزل');
+    expect(home).toContain('Object.prototype.hasOwnProperty.call(deliveryFees, selectedWilayaCode)');
     const styles = await readFile(new URL('./src/react-app/index.css', import.meta.url), 'utf8');
     expect(styles).toContain('.ecom12-video-card {\n  order: 8 !important;');
     expect(styles).toContain('height: min(460px, 60vh) !important;');

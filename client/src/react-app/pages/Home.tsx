@@ -304,7 +304,7 @@ const syncTelegramOrderMessage = async (
 };
 
 const buildAbandonedOrderMessage = (order: OrderPayload) =>
-  `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${order.leadId}\n🏷️ الحملة: ${order.campaign}\n💰 السعر: ${order.price} دج\n🚚 التوصيل: ${order.deliveryFee || 'يحدد بعد اختيار الولاية'} دج (${order.deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${order.fullName || 'لم يُدخل بعد'}\n📍 الولاية: ${order.wilaya || 'لم تُحدد بعد'}\n🏘️ البلدية: ${order.commune || 'لم تُحدد بعد'}\n📞 الهاتف: ${order.phone}\n🎁 الكتيب المجاني: ${order.giftBooklet ? 'نعم' : 'لا'}\n⏳ الحالة: غير مكتمل — تُحدّث هذه الرسالة نفسها أثناء تعبئة النموذج`;
+  `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${order.leadId}\n🏷️ الحملة: ${order.campaign}\n💰 السعر: ${order.price} دج\n🚚 توصيل للمنزل: ${order.deliveryFee || 'يحدد بعد اختيار الولاية'} دج\n👤 الاسم: ${order.fullName || 'لم يُدخل بعد'}\n📍 الولاية: ${order.wilaya || 'لم تُحدد بعد'}\n🏘️ البلدية: ${order.commune || 'لم تُحدد بعد'}\n📞 الهاتف: ${order.phone}\n🎁 الكتيب المجاني: ${order.giftBooklet ? 'نعم' : 'لا'}\n⏳ الحالة: غير مكتمل — تُحدّث هذه الرسالة نفسها أثناء تعبئة النموذج`;
 
 const fireFacebookEventOnce = (
   product: ProductLandingConfig,
@@ -368,7 +368,8 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
   const [phone, setPhone] = useState('');
   const [communes, setCommunes] = useState<Array<{ name: string; hasStopDesk: boolean }>>([]);
   const [deliveryFees, setDeliveryFees] = useState<Record<string, { home: number; stopDesk: number }>>({});
-  const [deliveryType, setDeliveryType] = useState<'home' | 'stop_desk'>('home');
+  const [deliveryFeesStatus, setDeliveryFeesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const deliveryType = 'home' as const;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [selectedBundleQuantity, setSelectedBundleQuantity] = useState(1);
@@ -400,11 +401,11 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
   const initiateCheckoutSentRef = useRef(false);
 
   const phoneError = phone ? validatePhone(phone) : '';
-  const selectedWilayaCode = wilaya.match(/^\s*(\d{1,2})/)?.[1] || '';
+  const rawWilayaCode = wilaya.match(/^\s*(\d{1,2})/)?.[1] || '';
+  const selectedWilayaCode = rawWilayaCode ? String(Number(rawWilayaCode)) : '';
   const selectedFee = deliveryFees[selectedWilayaCode] || { home: 0, stopDesk: 0 };
-  const deliveryFee = deliveryType === 'stop_desk' ? selectedFee.stopDesk : selectedFee.home;
-  const selectedCommune = communes.find((item) => item.name === commune);
-  const canUseStopDesk = Boolean(selectedCommune?.hasStopDesk);
+  const hasDeliveryFee = Boolean(selectedWilayaCode) && Object.prototype.hasOwnProperty.call(deliveryFees, selectedWilayaCode);
+  const deliveryFee = selectedFee.home;
 
   const getActiveDraftLeadId = () => {
     if (!activeDraftLeadIdRef.current) {
@@ -453,19 +454,18 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
           if (code) mapped[code] = { home: Number(fee.tarif || 0), stopDesk: Number(fee.tarif_stopdesk || fee.tarif || 0) };
         }
         setDeliveryFees(mapped);
+        setDeliveryFeesStatus('ready');
       })
-      .catch(() => undefined);
+      .catch(() => setDeliveryFeesStatus('error'));
   }, []);
 
   useEffect(() => {
     if (!wilaya) {
       setCommunes([]);
         setCommune('');
-        setDeliveryType('home');
         return;
     }
     setCommune('');
-    setDeliveryType('home');
     void fetch(`/api/orders?resource=communes&wilaya=${encodeURIComponent(wilaya)}`)
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('communes')))
       .then((data: { communes?: Array<{ name: string; hasStopDesk: boolean }> }) => setCommunes(data.communes || []))
@@ -637,6 +637,13 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
       return;
     }
 
+    if (deliveryFeesStatus !== 'ready' || !hasDeliveryFee) {
+      alert(deliveryFeesStatus === 'loading'
+        ? 'يرجى الانتظار حتى يتم تحميل رسوم التوصيل ثم أعد المحاولة.'
+        : 'تعذّر تحديد رسوم التوصيل لهذه الولاية. أعد تحميل الصفحة وحاول مرة أخرى.');
+      return;
+    }
+
     trackInitiateCheckout();
     const trimmedPhone = phone.trim();
     const leadId = getActiveDraftLeadId();
@@ -652,7 +659,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
       await draftSyncPromiseRef.current;
     }
 
-    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${campaignLabel}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
+    const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${campaignLabel}\n💰 السعر: ${offerPrice} دج\n🚚 توصيل للمنزل: ${deliveryFee} دج\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
     const orderSaved = await saveOrder({
       leadId,
       status: 'complete',
@@ -726,9 +733,11 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
               <p className="text-base font-extrabold text-emerald-800">🍓🤍🍍 {design === 'ecom12' ? 'صنف نادر بنكهة فراولة ولمسة أناناس خفيفة' : product.subheadline}</p>
             </div>
 
-            <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
-              {design === 'ecom12' ? 'ازرع Pineberry المميزة: فراولة بيضاء قليلة الانتشار، بطابع حلو يذكّر قليلًا بالأناناس.' : product.description}
-            </p>
+            {design !== 'ecom12' && (
+              <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
+                {product.description}
+              </p>
+            )}
 
             {design === 'ecom12' && (
               <div className="ecom12-purchase-facts" dir="rtl" aria-label="معلومات المنتج والطلب">
@@ -855,7 +864,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                       <select
                         id="commune"
                         value={commune}
-                        onChange={(event) => { const value = event.target.value; setCommune(value); const selected = communes.find((item) => item.name === value); if (selected && !selected.hasStopDesk) setDeliveryType('home'); }}
+                        onChange={(event) => setCommune(event.target.value)}
                         disabled={!wilaya || communes.length === 0}
                         className="h-12 w-full rounded-4xl border-2 border-amber-200 bg-amber-50/40 px-4 text-right text-base font-medium shadow-sm outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100 disabled:cursor-not-allowed disabled:opacity-70"
                         dir="rtl"
@@ -889,14 +898,41 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                   </p>
                 )}
 
-                <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">
+                <div className={`text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200 ${design === 'ecom12' ? 'ecom12-price-summary' : ''}`} dir="rtl">
                   <p className="text-base font-semibold text-gray-800">
-                    {design === 'ecom12' ? 'السعر:' : 'سعر المنتج:'} <span className="text-xl font-extrabold text-emerald-700">{offerPrice} {product.currency}</span>
+                    {design === 'ecom12' ? 'سعر الباقة:' : 'سعر المنتج:'} <span className="text-xl font-extrabold text-emerald-700">{offerPrice} {product.currency}</span>
                   </p>
                   {compareAtTotal && offerPrice < compareAtTotal && (
                     <p className="mt-1 text-xs font-semibold text-gray-500">
                       <span className="line-through">{compareAtTotal} {product.currency}</span>
                       <span className="mx-2 rounded-full bg-rose-100 px-2 py-1 text-rose-700">خصم {Math.round(((compareAtTotal - offerPrice) / compareAtTotal) * 100)}%</span>
+                    </p>
+                  )}
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-emerald-200 pt-3 text-sm font-semibold text-gray-700" dir="rtl">
+                    <span>التوصيل إلى المنزل</span>
+                    <span className="text-gray-900">
+                      {deliveryFeesStatus === 'ready' && hasDeliveryFee
+                        ? `${deliveryFee} ${product.currency}`
+                        : !wilaya
+                          ? 'يُحسب بعد اختيار الولاية'
+                          : deliveryFeesStatus === 'loading'
+                            ? 'جارٍ احتسابه…'
+                            : deliveryFeesStatus === 'error'
+                              ? 'تعذّر تحميل الرسم'
+                              : 'غير متاح لهذه الولاية'}
+                    </span>
+                  </div>
+                  {deliveryFeesStatus === 'ready' && hasDeliveryFee ? (
+                    <p className="ecom12-final-total mt-2 text-lg font-black text-gray-950">
+                      الإجمالي النهائي: {offerPrice + deliveryFee} {product.currency}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs font-semibold text-gray-600">
+                      {!wilaya
+                        ? 'اختر الولاية لعرض المبلغ النهائي شامل التوصيل'
+                        : deliveryFeesStatus === 'loading'
+                          ? 'سيظهر المبلغ النهائي بعد احتساب التوصيل'
+                          : 'لا يمكن تأكيد الإجمالي حتى تتوفر رسوم التوصيل'}
                     </p>
                   )}
                 </div>
@@ -921,26 +957,6 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                         <p className="text-[11px] font-bold text-emerald-800">{badge}</p>
                       </div>
                     ))}
-                  </div>
-                )}
-
-                {wilaya && (
-                  <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4" dir="rtl">
-                    <p className="text-sm font-bold text-gray-800">التوصيل</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <label className={`cursor-pointer rounded-lg border p-3 ${deliveryType === 'home' ? 'border-emerald-500 bg-white' : 'border-amber-100 bg-transparent'}`}>
-                        <input className="sr-only" type="radio" checked={deliveryType === 'home'} onChange={() => setDeliveryType('home')} />
-                        <span className="font-semibold">إلى المنزل</span>
-                        <span className="mt-1 block text-xs text-gray-600">{selectedFee.home ? `${selectedFee.home} دج` : 'يحدد حسب الولاية'}</span>
-                      </label>
-                      <label className={`cursor-pointer rounded-lg border p-3 ${deliveryType === 'stop_desk' ? 'border-emerald-500 bg-white' : 'border-amber-100 bg-transparent'} ${!canUseStopDesk ? 'cursor-not-allowed opacity-50' : ''}`}>
-                        <input className="sr-only" type="radio" checked={deliveryType === 'stop_desk'} onChange={() => canUseStopDesk && setDeliveryType('stop_desk')} disabled={!canUseStopDesk} />
-                        <span className="font-semibold">إلى المكتب</span>
-                        <span className="mt-1 block text-xs text-gray-600">{canUseStopDesk && selectedFee.stopDesk ? `${selectedFee.stopDesk} دج` : 'غير متاح لهذه البلدية'}</span>
-                      </label>
-                    </div>
-                    <p className="text-xs font-medium text-amber-800">حسب الولاية</p>
-                    {deliveryFee > 0 && <p className="text-sm font-bold text-gray-900">المجموع التقريبي: {offerPrice + deliveryFee} دج</p>}
                   </div>
                 )}
 
