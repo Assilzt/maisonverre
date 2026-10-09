@@ -42,6 +42,10 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain('https://www.youtube-nocookie.com/embed/${videoId}');
     expect(home).toContain('loading="lazy"');
     expect(home).toContain('<YouTubeEmbedPlayer videoId="u_yHscxu_pc" />');
+    expect(home).toContain('حوالي 200–300 بذرة في العلبة');
+    expect(home).toContain('التوصيل المعتاد: يوم إلى يومين');
+    expect(home).toContain('ضمان استبدال عند وجود مشكلة بالمنتج');
+    expect(home).toContain('ولا يمكن ضمان إنبات كل بذرة');
     const styles = await readFile(new URL('./src/react-app/index.css', import.meta.url), 'utf8');
     expect(styles).toContain('.ecom12-video-card {\n  order: 8 !important;');
     expect(home).toContain("/^(0[567]\\d{8}|\\+213[567]\\d{8})$/");
@@ -51,8 +55,9 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain('price: offerPrice');
     expect(home).toContain('campaign: campaignLabel');
     expect(product).toContain('{ quantity: 1, price: 1990, label: "علبة واحدة" }');
-    expect(product).toContain('{ quantity: 2, price: 2990, label: "علبتان" }');
-    expect(product).toContain('{ quantity: 3, price: 3500, label: "3 علب" }');
+    expect(product).toContain('price: 1990,');
+    expect(product).toContain('{ quantity: 2, price: 2700, label: "علبتان" }');
+    expect(product).toContain('{ quantity: 3, price: 3400, label: "3 علب" }');
   });
 
   it('stores the Meta Pixel ID behind dashboard authentication and initializes it from saved settings', async () => {

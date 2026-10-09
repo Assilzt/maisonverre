@@ -61,12 +61,11 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
     subheadline: "ثمار بيضاء مميزة بنكهة فراولة حلوة ولمسة أناناس خفيفة",
     description:
       "ازرع صنف Pineberry النادر في منزلك؛ فراولة بيضاء بطابع مميز ونكهة تذكّر قليلًا بالأناناس. اختَر الولاية والبلدية وسنتصل بك لتأكيد الطلب.",
-    price: 1900,
-    compareAtPrice: 2700,
+    price: 1990,
     bundles: [
       { quantity: 1, price: 1990, label: "علبة واحدة" },
-      { quantity: 2, price: 2990, label: "علبتان" },
-      { quantity: 3, price: 3500, label: "3 علب" },
+      { quantity: 2, price: 2700, label: "علبتان" },
+      { quantity: 3, price: 3400, label: "3 علب" },
     ],
     currency: "دج",
     images: [

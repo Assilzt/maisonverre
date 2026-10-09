@@ -731,6 +731,14 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
             </p>
 
             {design === 'ecom12' && (
+              <div className="ecom12-purchase-facts" dir="rtl" aria-label="معلومات المنتج والطلب">
+                <span>📦 حوالي 200–300 بذرة في العلبة</span>
+                <span>🚚 التوصيل المعتاد: يوم إلى يومين</span>
+                <span>↩️ ضمان استبدال عند وجود مشكلة بالمنتج</span>
+              </div>
+            )}
+
+            {design === 'ecom12' && (
               <a
                 className="ecom12-cta"
                 href="#lead-form"
@@ -873,6 +881,12 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                       </button>
                     ))}
                   </div>
+                )}
+
+                {design === 'ecom12' && (
+                  <p className="ecom12-seed-note" dir="rtl">
+                    كل علبة تحتوي على حوالي 200 إلى 300 بذرة. يختلف الإنبات حسب جودة البذور وطريقة الزراعة والظروف المناسبة؛ ولا يمكن ضمان إنبات كل بذرة.
+                  </p>
                 )}
 
                 <div className="text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200" dir="rtl">

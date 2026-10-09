@@ -437,6 +437,25 @@
   text-align: center;
 }
 
+.ecom12-purchase-facts {
+  order: 5 !important;
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  margin: 10px 0 4px;
+  color: #444;
+  font-size: .8rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.ecom12-purchase-facts span {
+  padding: 8px 10px;
+  border: 1px solid #e8e8e8;
+  border-radius: 9px;
+  background: #fafafa;
+}
+
 .ecom12-cta {
   order: 5;
   display: flex;
@@ -693,6 +712,14 @@
   border-color: #0a0a0a;
   background: #0a0a0a;
   color: #fff;
+}
+
+.ecom12-seed-note {
+  margin: -10px 0 16px;
+  color: #666;
+  font-size: .76rem;
+  line-height: 1.75;
+  text-align: right;
 }
 
 .ecom12-copy-card form > div:has(> p > span.text-xl) {
