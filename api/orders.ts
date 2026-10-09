@@ -92,17 +92,18 @@ type OrderRow = {
 };
 
 const selectColumns = `id, lead_id, status, campaign, price, delivery_fee, delivery_type, phone, full_name, wilaya, commune, source_url, ecotrack_tracking, ecotrack_status, ecotrack_driver, ecotrack_driver_phone, ecotrack_desk_phone, ecotrack_station, ecotrack_last_note, ecotrack_last_activity_at, ecotrack_last_synced_at, gift_booklet, shipping_provider_id, shipping_provider_name, stock_product_id, stock_product_name, ship_from_stock, status_before_trash, trashed_at, confirmation_status, contact_result, contact_attempts, last_contacted_at, follow_up_at, shipment_status, payment_status, created_at, updated_at`;
+// EcoTrack returns the official Algerian wilaya codes, including 49-58.
 const ecoToOfficialWilaya: Record<number, number> = {
-  57: 49,
-  58: 50,
-  51: 51,
-  50: 52,
-  52: 53,
-  49: 54,
-  55: 55,
-  56: 56,
-  53: 57,
-  54: 58,
+  49: 49, // Timimoun
+  50: 50, // Bordj Badji Mokhtar
+  51: 51, // Ouled Djellal
+  52: 52, // Béni Abbès
+  53: 53, // In Salah
+  54: 54, // In Guezzam
+  55: 55, // Touggourt
+  56: 56, // Djanet
+  57: 57, // El M'Ghair
+  58: 58, // El Meniaa
 };
 
 const ensureSchema = async () => {

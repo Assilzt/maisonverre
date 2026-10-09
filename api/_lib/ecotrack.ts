@@ -35,17 +35,19 @@ const normalizePhone = (value: string) => {
   return digits;
 };
 
+// EcoTrack uses the official Algerian codes for the 10 newer wilayas.
+// Keep this explicit so a provider-specific mapping cannot silently reorder 49-58.
 const officialToEcoTrack: Record<number, number> = {
-  49: 57,
-  50: 58,
-  51: 51,
-  52: 50,
-  53: 52,
-  54: 49,
-  55: 55,
-  56: 56,
-  57: 53,
-  58: 54,
+  49: 49, // Timimoun
+  50: 50, // Bordj Badji Mokhtar
+  51: 51, // Ouled Djellal
+  52: 52, // Béni Abbès
+  53: 53, // In Salah
+  54: 54, // In Guezzam
+  55: 55, // Touggourt
+  56: 56, // Djanet
+  57: 57, // El M'Ghair
+  58: 58, // El Meniaa
 };
 
 const normalizeLocationText = (value: string) =>
@@ -98,11 +100,16 @@ const comparableLocationText = (value: string) =>
 const wilayaCode = (value: string) => {
   const raw = String(value || "");
   const match = raw.match(/^\s*(\d{1,2})/);
+  if (match) {
+    const official = Number(match[1]);
+    if (Number.isInteger(official) && official >= 1 && official <= 58)
+      return officialToEcoTrack[official] || official;
+  }
   const normalized = canonicalLocationText(
     raw.replace(/^\s*\d{1,2}\s*[-–:]?\s*/, "")
   );
   if (normalized === "in guezzam") return 54;
-  const official = match ? Number(match[1]) : Number(raw);
+  const official = Number(raw);
   if (!Number.isInteger(official) || official < 1 || official > 58) return null;
   return officialToEcoTrack[official] || official;
 };

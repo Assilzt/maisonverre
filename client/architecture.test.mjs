@@ -93,4 +93,16 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain('getProductPurchaseEventData(product, offerPrice)');
     expect(html).not.toContain('837444182648161');
   });
+
+  it('keeps EcoTrack and storefront codes aligned for wilayas 49-58', async () => {
+    const ecoTrack = await readFile(new URL('../api/_lib/ecotrack.ts', import.meta.url), 'utf8');
+    const orders = await readFile(new URL('../api/orders.ts', import.meta.url), 'utf8');
+    const home = await readFile(new URL('./src/react-app/pages/Home.tsx', import.meta.url), 'utf8');
+    expect(ecoTrack).toContain('49: 49, // Timimoun');
+    expect(ecoTrack).toContain('58: 58, // El Meniaa');
+    expect(orders).toContain('49: 49, // Timimoun');
+    expect(orders).toContain('58: 58, // El Meniaa');
+    expect(home).toContain("'49 - تيميمون'");
+    expect(home).toContain("'58 - المنيعة'");
+  });
 });
