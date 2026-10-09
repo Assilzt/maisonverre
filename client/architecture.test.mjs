@@ -33,6 +33,11 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain("href=\"#lead-form\"");
     expect(home).toContain("'AddToCart',\n                    'ecom12-add-to-cart'");
     expect(home).toContain('🍓🤍🍍');
+    expect(home).toContain('digitCount < 3 && !activeDraftLeadIdRef.current');
+    expect(home).toContain('draftSync: true');
+    expect(home).toContain("getProductSessionLeadId(product)");
+    expect(home).toContain("data?.messageId ?? data?.result?.message_id ?? messageId");
+    expect(home).toContain("{ action: 'edit', messageId, text }");
     expect(home).toContain("/^(0[567]\\d{8}|\\+213[567]\\d{8})$/");
     expect(home.indexOf("fireFacebookEventOnce(product, 'Purchase'")).toBeLessThan(home.indexOf('const orderSaved = await saveOrder'));
     expect(home).toContain('`purchase:${leadId}`');

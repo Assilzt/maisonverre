@@ -1414,6 +1414,8 @@ export default async function handler(request: Request, response: Response) {
         body.leadId || `AT-${Date.now().toString(36).toUpperCase()}`
       ).slice(0, 64);
       const status = body.status === "complete" ? "complete" : "abandoned";
+      const isDraftSync = body.draftSync === true;
+      const existingOrders = (await sql!`SELECT id, status FROM atlasio_orders WHERE lead_id = ${leadId} LIMIT 1`) as Array<{ id: number; status: string }>;
       const campaign = String(body.campaign || "الرابط الأساسي").slice(0, 64);
       const deliveryFee = Number(body.deliveryFee || 0);
       const deliveryType = body.deliveryType
@@ -1434,14 +1436,21 @@ export default async function handler(request: Request, response: Response) {
         ON CONFLICT (lead_id) DO UPDATE SET status = EXCLUDED.status, campaign = EXCLUDED.campaign, price = EXCLUDED.price, delivery_fee = EXCLUDED.delivery_fee, delivery_type = EXCLUDED.delivery_type, phone = EXCLUDED.phone, full_name = EXCLUDED.full_name, wilaya = EXCLUDED.wilaya, commune = EXCLUDED.commune, source_url = EXCLUDED.source_url, gift_booklet = EXCLUDED.gift_booklet, updated_at = NOW()
         RETURNING ${sql!.unsafe(selectColumns)}
       `;
-      await recordEvent(
-        Number(saved[0].id),
-        "order_created",
-        "تم إنشاء الطلب من صفحة الهبوط",
-        null,
-        status,
-        { campaign, sourceUrl }
-      );
+      if (!isDraftSync || existingOrders.length === 0) {
+        const existingOrder = existingOrders[0];
+        await recordEvent(
+          Number(saved[0].id),
+          existingOrder ? "order_updated" : "order_created",
+          existingOrder
+            ? status === "complete"
+              ? "تم إكمال الطلب من صفحة الهبوط"
+              : "تم تحديث بيانات الطلب من صفحة الهبوط"
+            : "تم إنشاء الطلب من صفحة الهبوط",
+          existingOrder?.status || null,
+          status,
+          { campaign, sourceUrl }
+        );
+      }
       response.status(200).json({ order: saved[0] });
       return;
     }

@@ -12,10 +12,10 @@ import {
   getPixelStorageKey,
   getProductCampaignLabel,
   getProductEventData,
-  getProductLeadId,
   getProductLeadMessageStorageKey,
-  getProductLeadStorageKey,
   getProductOfferPrice,
+  getProductSessionLeadId,
+  resetProductSessionLeadId,
 } from '@/react-app/product-config';
 
 const WILAYAS = [
@@ -117,6 +117,7 @@ const saveOrder = async (payload: {
   deliveryFee?: number;
   deliveryType?: 'home' | 'stop_desk';
   giftBooklet?: boolean;
+  draftSync?: boolean;
 }): Promise<boolean> => {
   try {
     const response = await fetch('/api/orders', {
@@ -129,6 +130,60 @@ const saveOrder = async (payload: {
     return false;
   }
 };
+
+type OrderPayload = Parameters<typeof saveOrder>[0];
+
+const telegramMessageIdFallbacks = new Map<string, number>();
+
+const syncTelegramOrderMessage = async (
+  product: ProductLandingConfig,
+  leadId: string,
+  text: string,
+): Promise<boolean> => {
+  const storageKey = getProductLeadMessageStorageKey(product, leadId);
+  const cacheKey = `${product.slug}:${leadId}`;
+  let messageId = telegramMessageIdFallbacks.get(cacheKey) || 0;
+  try {
+    messageId = Number(window.sessionStorage.getItem(storageKey)) || messageId;
+  } catch {
+    // The in-memory map still lets this page edit the same Telegram message.
+  }
+
+  try {
+    const response = await fetch('/api/telegram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        messageId
+          ? { action: 'edit', messageId, text }
+          : { action: 'send', text },
+      ),
+    });
+    const data = (await response.json().catch(() => null)) as {
+      messageId?: unknown;
+      result?: { message_id?: unknown };
+    } | null;
+    if (!response.ok) return false;
+
+    const returnedMessageId = Number(
+      data?.messageId ?? data?.result?.message_id ?? messageId,
+    );
+    if (Number.isInteger(returnedMessageId) && returnedMessageId > 0) {
+      telegramMessageIdFallbacks.set(cacheKey, returnedMessageId);
+      try {
+        window.sessionStorage.setItem(storageKey, String(returnedMessageId));
+      } catch {
+        // The in-memory map still prevents duplicate messages in this page.
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const buildAbandonedOrderMessage = (order: OrderPayload) =>
+  `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${order.leadId}\n🏷️ الحملة: ${order.campaign}\n💰 السعر: ${order.price} دج\n🚚 التوصيل: ${order.deliveryFee || 'يحدد بعد اختيار الولاية'} دج (${order.deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${order.fullName || 'لم يُدخل بعد'}\n📍 الولاية: ${order.wilaya || 'لم تُحدد بعد'}\n🏘️ البلدية: ${order.commune || 'لم تُحدد بعد'}\n📞 الهاتف: ${order.phone}\n🎁 الكتيب المجاني: ${order.giftBooklet ? 'نعم' : 'لا'}\n⏳ الحالة: غير مكتمل — تُحدّث هذه الرسالة نفسها أثناء تعبئة النموذج`;
 
 const fireFacebookEventOnce = (
   product: ProductLandingConfig,
@@ -207,6 +262,10 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
   const userInteractedRef = useRef(false);
   const facebookLeadSentRef = useRef(false);
   const viewContentSentRef = useRef(false);
+  const activeDraftLeadIdRef = useRef<string | null>(null);
+  const pendingDraftSyncRef = useRef<OrderPayload | null>(null);
+  const draftSyncTimerRef = useRef<number | null>(null);
+  const draftSyncPromiseRef = useRef<Promise<void> | null>(null);
   const limitedOfferActive = Boolean(limitedOfferEndsAt && currentTime < limitedOfferEndsAt);
   const giftOfferActive = Boolean(giftOfferEndsAt && currentTime < giftOfferEndsAt);
   const baseOfferPrice = isLimitedOffer && !limitedOfferActive ? product.compareAtPrice || product.price : getProductOfferPrice(product, searchParams, isLimitedOffer);
@@ -225,6 +284,43 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
   const deliveryFee = deliveryType === 'stop_desk' ? selectedFee.stopDesk : selectedFee.home;
   const selectedCommune = communes.find((item) => item.name === commune);
   const canUseStopDesk = Boolean(selectedCommune?.hasStopDesk);
+
+  const getActiveDraftLeadId = () => {
+    if (!activeDraftLeadIdRef.current) {
+      activeDraftLeadIdRef.current = getProductSessionLeadId(product);
+    }
+    return activeDraftLeadIdRef.current;
+  };
+
+  const runPendingDraftSync = async (): Promise<void> => {
+    if (draftSyncPromiseRef.current) return draftSyncPromiseRef.current;
+
+    const syncTask = (async () => {
+      while (pendingDraftSyncRef.current) {
+        const draft = pendingDraftSyncRef.current;
+        pendingDraftSyncRef.current = null;
+        if (await saveOrder(draft)) {
+          await syncTelegramOrderMessage(
+            product,
+            draft.leadId,
+            buildAbandonedOrderMessage(draft),
+          );
+        }
+      }
+    })();
+
+    draftSyncPromiseRef.current = syncTask;
+    try {
+      await syncTask;
+    } finally {
+      if (draftSyncPromiseRef.current === syncTask) {
+        draftSyncPromiseRef.current = null;
+      }
+      if (pendingDraftSyncRef.current && !isSubmitting) {
+        void runPendingDraftSync();
+      }
+    }
+  };
 
   useEffect(() => {
     void fetch('/api/orders?resource=fees')
@@ -362,57 +458,54 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
 
   useEffect(() => {
     const trimmedPhone = phone.trim();
+    const digitCount = trimmedPhone.replace(/\D/g, '').length;
+    if (!trimmedPhone || submitted || isSubmitting) return;
+    if (digitCount < 3 && !activeDraftLeadIdRef.current) return;
 
-    if (!PHONE_PATTERN.test(trimmedPhone) || submitted) {
-      return;
-    }
-
-    const leadStorageKey = getProductLeadStorageKey(product, trimmedPhone);
-
-    try {
-      if (window.sessionStorage.getItem(leadStorageKey)) {
-        return;
-      }
-
-      // Mark before sending so React re-renders or repeated input events cannot duplicate the lead.
-      window.sessionStorage.setItem(leadStorageKey, '1');
-    } catch {
-      // Continue without deduplication if browser storage is unavailable.
-    }
-
-    const leadId = getProductLeadId(product, trimmedPhone);
-    void saveOrder({
-      leadId,
+    const draft: OrderPayload = {
+      leadId: getActiveDraftLeadId(),
       status: 'abandoned',
       price: offerPrice,
       campaign: campaignLabel,
       phone: trimmedPhone,
+      fullName: fullName.trim() || undefined,
+      wilaya: wilaya || undefined,
+      commune: commune.trim() || undefined,
       deliveryFee,
       deliveryType,
       giftBooklet: giftBookletSelected && giftOfferActive,
-    });
-    const leadMessage = `🟡 طلب غير مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${campaignLabel}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee || 'يحدد بعد اختيار الولاية'} دج\n📞 الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n⏳ الحالة: بانتظار إكمال البيانات والتأكيد`;
+      draftSync: true,
+    };
 
-    void fetch('/api/telegram', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ action: 'send', text: leadMessage }),
-    })
-      .then(async (response) => {
-        const data = await response.json().catch(() => null);
-        const messageId = data?.result?.message_id;
-        if (response.ok && messageId) {
-          try {
-            window.sessionStorage.setItem(getProductLeadMessageStorageKey(product, trimmedPhone), String(messageId));
-          } catch {
-            // Telegram delivery should never block the lead flow.
-          }
-        }
-      })
-      .catch(() => undefined);
-  }, [phone, submitted]);
+    pendingDraftSyncRef.current = draft;
+    if (draftSyncTimerRef.current !== null) {
+      window.clearTimeout(draftSyncTimerRef.current);
+    }
+    draftSyncTimerRef.current = window.setTimeout(() => {
+      draftSyncTimerRef.current = null;
+      void runPendingDraftSync();
+    }, 700);
+
+    return () => {
+      if (draftSyncTimerRef.current !== null) {
+        window.clearTimeout(draftSyncTimerRef.current);
+        draftSyncTimerRef.current = null;
+      }
+    };
+  }, [
+    phone,
+    fullName,
+    wilaya,
+    commune,
+    offerPrice,
+    campaignLabel,
+    deliveryFee,
+    deliveryType,
+    giftBookletSelected,
+    giftOfferActive,
+    submitted,
+    isSubmitting,
+  ]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -425,9 +518,18 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
 
     trackInitiateCheckout();
     const trimmedPhone = phone.trim();
-    const leadId = getProductLeadId(product, trimmedPhone);
+    const leadId = getActiveDraftLeadId();
     fireFacebookEventOnce(product, 'Purchase', `purchase:${leadId}`, productEventData);
     setIsSubmitting(true);
+
+    if (draftSyncTimerRef.current !== null) {
+      window.clearTimeout(draftSyncTimerRef.current);
+      draftSyncTimerRef.current = null;
+    }
+    pendingDraftSyncRef.current = null;
+    if (draftSyncPromiseRef.current) {
+      await draftSyncPromiseRef.current;
+    }
 
     const message = `✅ طلب مكتمل\n🆔 رقم المتابعة: ${leadId}\n🏷️ الحملة: ${campaignLabel}\n💰 السعر: ${offerPrice} دج\n🚚 التوصيل: ${deliveryFee} دج (${deliveryType === 'stop_desk' ? 'المكتب' : 'المنزل'})\n👤 الاسم: ${fullName || '—'}\n📍 الولاية: ${wilaya || '—'}\n🏘️ البلدية: ${commune.trim() || '—'}\n📞 رقم الهاتف: ${trimmedPhone}\n🎁 الكتيب المجاني: ${giftBookletSelected && giftOfferActive ? 'نعم' : 'لا'}\n✅ الحالة: جاهز للتأكيد الهاتفي`;
     const orderSaved = await saveOrder({
@@ -451,6 +553,8 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
       setCommune('');
       setPhone('');
       facebookLeadSentRef.current = false;
+      resetProductSessionLeadId(product);
+      activeDraftLeadIdRef.current = null;
     } else {
       alert('تعذر تسجيل الطلب، يرجى المحاولة مرة أخرى.');
       setIsSubmitting(false);
@@ -458,32 +562,15 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
     }
 
     try {
-      const leadMessageId = window.sessionStorage.getItem(getProductLeadMessageStorageKey(product, trimmedPhone));
-      let responseOk = false;
-
-      if (leadMessageId) {
-        const response = await fetch('/api/telegram', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ action: 'edit', messageId: Number(leadMessageId), text: message }),
-        });
-        responseOk = response.ok;
-      } else {
-        const response = await fetch('/api/telegram', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ action: 'send', text: message }),
-        });
-        responseOk = response.ok;
-      }
-
-      if (responseOk) {
-        window.sessionStorage.removeItem(getProductLeadStorageKey(product, trimmedPhone));
-        window.sessionStorage.removeItem(getProductLeadMessageStorageKey(product, trimmedPhone));
+      const telegramSent = await syncTelegramOrderMessage(product, leadId, message);
+      if (telegramSent) {
+        const messageStorageKey = getProductLeadMessageStorageKey(product, leadId);
+        telegramMessageIdFallbacks.delete(`${product.slug}:${leadId}`);
+        try {
+          window.sessionStorage.removeItem(messageStorageKey);
+        } catch {
+          // The order is complete even if local tracking storage is unavailable.
+        }
       }
     } catch (error) {
       console.warn('Telegram notification failed after order save', error);
@@ -559,7 +646,11 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                 <h2 className="text-xl font-semibold text-green-600 mb-2" dir="rtl">تم استلام طلبك!</h2>
                 <p className="text-gray-600" dir="rtl">سنتصل بك قريباً</p>
                 <Button 
-                  onClick={() => setSubmitted(false)}
+                  onClick={() => {
+                    resetProductSessionLeadId(product);
+                    activeDraftLeadIdRef.current = null;
+                    setSubmitted(false);
+                  }}
                   className="mt-4 bg-pink-500 hover:bg-pink-600"
                 >
                   طلب جديد

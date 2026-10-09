@@ -232,6 +232,29 @@ export function getProductLeadId(
   }
 }
 
+export function getProductSessionLeadId(product: ProductLandingConfig): string {
+  const storageKey = `${getProductStoragePrefix(product)}:lead-id:active-form-draft`;
+  try {
+    const existingId = window.sessionStorage.getItem(storageKey);
+    if (existingId) return existingId;
+    const leadId = `AT-${Date.now().toString(36).toUpperCase()}`;
+    window.sessionStorage.setItem(storageKey, leadId);
+    return leadId;
+  } catch {
+    return `AT-${Date.now().toString(36).toUpperCase()}`;
+  }
+}
+
+export function resetProductSessionLeadId(product: ProductLandingConfig): void {
+  try {
+    window.sessionStorage.removeItem(
+      `${getProductStoragePrefix(product)}:lead-id:active-form-draft`
+    );
+  } catch {
+    // Starting a new form still works when session storage is unavailable.
+  }
+}
+
 export function formatCountdown(milliseconds: number): string {
   const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
   const minutes = Math.floor(totalSeconds / 60)
