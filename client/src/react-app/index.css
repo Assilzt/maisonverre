@@ -497,8 +497,8 @@
 .ecom12-image-column img {
   display: block;
   width: 100%;
-  height: auto !important;
-  max-height: none;
+  height: min(460px, 60vh) !important;
+  max-height: 460px;
   aspect-ratio: auto !important;
   object-fit: contain !important;
   background: transparent !important;

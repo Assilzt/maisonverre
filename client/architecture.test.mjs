@@ -48,6 +48,10 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain('ولا يمكن ضمان إنبات كل بذرة');
     const styles = await readFile(new URL('./src/react-app/index.css', import.meta.url), 'utf8');
     expect(styles).toContain('.ecom12-video-card {\n  order: 8 !important;');
+    expect(styles).toContain('height: min(460px, 60vh) !important;');
+    expect(product).toContain('src: "/images/white-strawberry-cropped.webp"');
+    const croppedProductImage = await readFile(new URL('./public/images/white-strawberry-cropped.webp', import.meta.url));
+    expect(croppedProductImage.length).toBeGreaterThan(0);
     expect(home).toContain("/^(0[567]\\d{8}|\\+213[567]\\d{8})$/");
     expect(home.indexOf("fireFacebookEventOnce(product, 'Purchase'")).toBeLessThan(home.indexOf('const orderSaved = await saveOrder'));
     expect(home).toContain('`purchase:${leadId}`');

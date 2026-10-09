@@ -70,7 +70,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
     currency: "دج",
     images: [
       {
-        src: "/images/white-strawberry.webp",
+        src: "/images/white-strawberry-cropped.webp",
         alt: "عبوة بذور الفراولة البيضاء الأناناسية Pineberry",
         label: "العبوة الرئيسية",
       },
