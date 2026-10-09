@@ -126,5 +126,6 @@ describe('Atlasio security and workflow baseline', () => {
     expect(orders).toContain('body.shippingMode');
     expect(dashboard).toContain('saveShippingMode(false)');
     expect(dashboard).toContain('shippingMode: useStock ? "stock" : "without_stock"');
+    expect(dashboard).toContain('setOrderShippingModes({});');
   });
 });

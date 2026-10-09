@@ -385,6 +385,7 @@ export default function Dashboard() {
     setPixelIdDraft(data.pixelId || "");
     setProvider(data.provider || "navexdelivery");
     setShipFromStock(data.shippingMode !== "without_stock");
+    setOrderShippingModes({});
     setTokenConfigured(Boolean(data.tokenConfigured));
     setFeeText(JSON.stringify(data.deliveryFees || {}, null, 2));
     setProviders(data.providers || []);
@@ -482,6 +483,7 @@ export default function Dashboard() {
 
   const saveShippingMode = async (useStock: boolean) => {
     setShipFromStock(useStock);
+    setOrderShippingModes({});
     setSavingSettings(true);
     setError("");
     try {
