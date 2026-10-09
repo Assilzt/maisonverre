@@ -76,6 +76,7 @@ describe('Atlasio security and workflow baseline', () => {
   it('stores the Meta Pixel ID behind dashboard authentication and initializes it from saved settings', async () => {
     const orders = await readFile(new URL('../api/orders.ts', import.meta.url), 'utf8');
     const dashboard = await readFile(new URL('./src/react-app/pages/Dashboard.tsx', import.meta.url), 'utf8');
+    const home = await readFile(new URL('./src/react-app/pages/Home.tsx', import.meta.url), 'utf8');
     const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
     const pixel = await readFile(new URL('./src/react-app/lib/meta-pixel.ts', import.meta.url), 'utf8');
     expect(orders).toContain("'meta_pixel_id', '837444182648161'");
@@ -88,6 +89,8 @@ describe('Atlasio security and workflow baseline', () => {
     expect(pixel).toContain('"PageView"');
     expect(pixel).toContain('sessionStorage.getItem(storageKey)');
     expect(pixel).toContain('sendPageViewOnce(pixelId)');
+    expect(pixel).toContain('Always ensure the real script is present');
+    expect(home).toContain('getProductPurchaseEventData(product, offerPrice)');
     expect(html).not.toContain('837444182648161');
   });
 });

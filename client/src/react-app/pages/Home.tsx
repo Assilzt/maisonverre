@@ -12,6 +12,7 @@ import {
   getPixelStorageKey,
   getProductCampaignLabel,
   getProductEventData,
+  getProductPurchaseEventData,
   getProductLeadMessageStorageKey,
   getProductOfferPrice,
   getProductSessionLeadId,
@@ -647,7 +648,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
     trackInitiateCheckout();
     const trimmedPhone = phone.trim();
     const leadId = getActiveDraftLeadId();
-    fireFacebookEventOnce(product, 'Purchase', `purchase:${leadId}`, productEventData);
+    fireFacebookEventOnce(product, 'Purchase', `purchase:${leadId}`, getProductPurchaseEventData(product, offerPrice));
     setIsSubmitting(true);
 
     if (draftSyncTimerRef.current !== null) {

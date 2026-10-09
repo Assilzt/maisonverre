@@ -44,25 +44,35 @@ const sendPageViewOnce = (pixelId: string) => {
   window.fbq?.("track", "PageView");
 };
 
-const installPixelStub = () => {
-  if (window.fbq) return;
-  const fbq = ((...args: unknown[]) => {
-    if (fbq.callMethod) fbq.callMethod(...args);
-    else (fbq.queue ||= []).push(args);
-  }) as PixelFunction;
-  fbq.push = fbq;
-  fbq.loaded = true;
-  fbq.version = "2.0";
-  fbq.queue = [];
-  window.fbq = fbq;
-  window._fbq = window._fbq || fbq;
+const ensurePixelScript = () => {
+  const scriptSrc = "https://connect.facebook.net/en_US/fbevents.js";
+  if (document.querySelector(`script[src="${scriptSrc}"]`)) return;
 
   const script = document.createElement("script");
   script.async = true;
-  script.src = "https://connect.facebook.net/en_US/fbevents.js";
+  script.src = scriptSrc;
   const firstScript = document.getElementsByTagName("script")[0];
   if (firstScript?.parentNode) firstScript.parentNode.insertBefore(script, firstScript);
   else document.head.appendChild(script);
+};
+
+const installPixelStub = () => {
+  if (!window.fbq) {
+    const fbq = ((...args: unknown[]) => {
+      if (fbq.callMethod) fbq.callMethod(...args);
+      else (fbq.queue ||= []).push(args);
+    }) as PixelFunction;
+    fbq.push = fbq;
+    fbq.loaded = true;
+    fbq.version = "2.0";
+    fbq.queue = [];
+    window.fbq = fbq;
+    window._fbq = window._fbq || fbq;
+  }
+
+  // A pre-existing stub may have queued events without loading Meta's library.
+  // Always ensure the real script is present, but never add it twice.
+  ensurePixelScript();
 };
 
 const sendEvent = (event: PendingPixelEvent) => {

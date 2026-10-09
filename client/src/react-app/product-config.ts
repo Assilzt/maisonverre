@@ -167,6 +167,16 @@ export function getProductEventData(
   };
 }
 
+export function getProductPurchaseEventData(
+  product: ProductLandingConfig,
+  price: number,
+): Record<string, unknown> {
+  const { currency: _currency, ...purchaseData } = getProductEventData(product, price);
+  // Meta rejects DZD for Purchase in the browser Pixel. Keep the amount and
+  // product data, but omit only the invalid currency parameter for this event.
+  return purchaseData;
+}
+
 export function getProductOfferPrice(
   product: ProductLandingConfig,
   searchParams: URLSearchParams,
