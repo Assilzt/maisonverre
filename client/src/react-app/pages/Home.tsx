@@ -512,10 +512,10 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
         <div className={`grid md:grid-cols-2 gap-8 items-start ${design === 'ecom12' ? 'ecom12-layout' : ''}`}>
           <div className={`order-2 md:order-none bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100 ${design === 'ecom12' ? 'ecom12-copy-card' : ''}`}>
             <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-gray-800" dir="rtl">
-              {design === 'ecom12' ? 'بذور الفراولة البيضاء الأناناسية | Pineberry' : product.headline} 🌸
+              {design === 'ecom12' ? 'بذور الفراولة البيضاء الأناناسية | Pineberry' : product.headline} 🍓🤍🍍
             </h1>
             <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm" dir="rtl">
-              <p className="text-base font-extrabold text-emerald-800">🌸 {design === 'ecom12' ? 'صنف نادر بنكهة فراولة ولمسة أناناس خفيفة' : product.subheadline}</p>
+              <p className="text-base font-extrabold text-emerald-800">🍓🤍🍍 {design === 'ecom12' ? 'صنف نادر بنكهة فراولة ولمسة أناناس خفيفة' : product.subheadline}</p>
             </div>
 
             <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
@@ -735,7 +735,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
 
                 {design !== 'ecom12' && <div className="mt-4 overflow-hidden rounded-2xl border border-pink-200 bg-gradient-to-br from-white via-pink-50/70 to-emerald-50/80 p-4 shadow-sm" dir="rtl">
                   <div className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm">
-                    <p className="text-[15px] font-bold text-emerald-800">🌸 {product.resultTitle}</p>
+                    <p className="text-[15px] font-bold text-emerald-800">🍓🤍🍍 {product.resultTitle}</p>
                   </div>
 
                   <div className="mb-3 flex items-center justify-between gap-3">

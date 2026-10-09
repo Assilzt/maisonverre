@@ -32,6 +32,7 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain("fireFacebookEventOnce(product, 'ViewContent', 'view-content', productEventData)");
     expect(home).toContain("href=\"#lead-form\"");
     expect(home).toContain("'AddToCart',\n                    'ecom12-add-to-cart'");
+    expect(home).toContain('🍓🤍🍍');
     expect(home).toContain("/^(0[567]\\d{8}|\\+213[567]\\d{8})$/");
     expect(home.indexOf("fireFacebookEventOnce(product, 'Purchase'")).toBeLessThan(home.indexOf('const orderSaved = await saveOrder'));
     expect(home).toContain('`purchase:${leadId}`');

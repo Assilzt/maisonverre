@@ -79,7 +79,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
     features: [
       {
         name: "Pineberry نادرة",
-        emoji: "🍓",
+        emoji: "🍓🤍🍍",
         accent: "bg-rose-100 text-rose-700",
         details: "صنف أبيض مميز",
         area: "حتى 1 م²",
@@ -100,7 +100,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductLandingConfig> = {
       },
       {
         name: "نكهة استثنائية",
-        emoji: "🍓",
+        emoji: "🍍🍓",
         accent: "bg-emerald-100 text-emerald-700",
         details: "حلاوة الفراولة ولمسة أناناس",
         area: "حتى 3 م²",
