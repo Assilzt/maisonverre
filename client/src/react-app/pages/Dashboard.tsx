@@ -384,6 +384,7 @@ export default function Dashboard() {
     const data = await response.json();
     setPixelIdDraft(data.pixelId || "");
     setProvider(data.provider || "navexdelivery");
+    setShipFromStock(data.shippingMode !== "without_stock");
     setTokenConfigured(Boolean(data.tokenConfigured));
     setFeeText(JSON.stringify(data.deliveryFees || {}, null, 2));
     setProviders(data.providers || []);
@@ -415,7 +416,6 @@ export default function Dashboard() {
     setSelectedStockProductId(
       nextProducts[0] ? String(nextProducts[0].id) : ""
     );
-    setShipFromStock(current => (nextProducts.length === 0 ? true : current));
   };
 
   useEffect(() => {
@@ -457,6 +457,7 @@ export default function Dashboard() {
           resource: "settings",
           providers: nextProviders,
           activeProviderId: activeProviderId || id,
+          shippingMode: shipFromStock ? "stock" : "without_stock",
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -479,6 +480,30 @@ export default function Dashboard() {
     }
   };
 
+  const saveShippingMode = async (useStock: boolean) => {
+    setShipFromStock(useStock);
+    setSavingSettings(true);
+    setError("");
+    try {
+      const response = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resource: "settings",
+          shippingMode: useStock ? "stock" : "without_stock",
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "تعذر حفظ وضع الشحن");
+      setShipFromStock(data.shippingMode !== "without_stock");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "تعذر حفظ وضع الشحن"
+      );
+    } finally {
+      setSavingSettings(false);
+    }
+  };
   const refreshStock = async (providerId: string) => {
     if (!providerId) {
       setStockProducts([]);
@@ -499,7 +524,6 @@ export default function Dashboard() {
       setSelectedStockProductId(
         nextProducts[0] ? String(nextProducts[0].id) : ""
       );
-      setShipFromStock(current => (nextProducts.length === 0 ? true : current));
       if (nextProducts.length === 0)
         setError(
           "لم تُرجع الشركة كتالوج منتجات؛ يمكن استخدام الشحن من stock مباشرة، أو أضف منتجاً محلياً إذا أردت تتبع الكمية."
@@ -508,7 +532,6 @@ export default function Dashboard() {
     } catch (requestError) {
       setStockProducts([]);
       setSelectedStockProductId("");
-      setShipFromStock(true);
       setError(
         requestError instanceof Error
           ? requestError.message
@@ -741,7 +764,7 @@ export default function Dashboard() {
     setLoading(true);
     setError("");
     try {
-      const shouldUseStock = shipFromStock && Boolean(selectedStockProductId);
+      const shouldUseStock = shipFromStock;
       const response = await fetch("/api/orders", {
         method: "PATCH",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -2449,14 +2472,14 @@ export default function Dashboard() {
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <button
                           type="button"
-                          onClick={() => setShipFromStock(true)}
+                          onClick={() => void saveShippingMode(true)}
                           className={`rounded-xl px-3 py-2.5 text-xs font-black ${shipFromStock ? "bg-emerald-500 text-white" : "bg-white text-slate-500"}`}
                         >
                           من stock
                         </button>
                         <button
                           type="button"
-                          onClick={() => setShipFromStock(false)}
+                          onClick={() => void saveShippingMode(false)}
                           className={`rounded-xl px-3 py-2.5 text-xs font-black ${!shipFromStock ? "bg-blue-500 text-white" : "bg-white text-slate-500"}`}
                         >
                           بدون stock

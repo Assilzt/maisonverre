@@ -181,6 +181,7 @@ const ensureSchema = async () => {
       await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('delivery_fees', '{}') ON CONFLICT (key) DO NOTHING`;
       await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('shipping_providers', '[]') ON CONFLICT (key) DO NOTHING`;
       await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('active_provider_id', '') ON CONFLICT (key) DO NOTHING`;
+      await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('shipping_mode', 'stock') ON CONFLICT (key) DO NOTHING`;
       await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('meta_pixel_id', '837444182648161') ON CONFLICT (key) DO NOTHING`;
     })();
   }
@@ -275,6 +276,8 @@ const loadEcoSettings = async (providerId?: string) => {
     deliveryFees: selected?.deliveryFees || legacyFees,
     providerId: selected?.id || "default",
     providerName: selected?.name || selected?.provider || "EcoTrack",
+    shippingMode:
+      values.shipping_mode === "without_stock" ? "without_stock" : "stock",
     providers,
   };
 };
@@ -449,6 +452,7 @@ export default async function handler(request: Request, response: Response) {
           providers: publicProviders(ecoSettings.providers),
           tokenConfigured: Boolean(ecoSettings.token),
           deliveryFees: ecoSettings.deliveryFees,
+          shippingMode: ecoSettings.shippingMode,
           pixelId: await loadMetaPixelId(),
         });
         return;
@@ -994,6 +998,15 @@ export default async function handler(request: Request, response: Response) {
 
       if (body.resource === "settings") {
         const hasPixelId = Object.prototype.hasOwnProperty.call(body, "pixelId");
+        const hasShippingMode = Object.prototype.hasOwnProperty.call(body, "shippingMode");
+        if (hasShippingMode) {
+          const shippingMode = String(body.shippingMode || "");
+          if (shippingMode !== "stock" && shippingMode !== "without_stock") {
+            response.status(400).json({ error: "وضع الشحن غير صالح" });
+            return;
+          }
+          await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('shipping_mode', ${shippingMode}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+        }
         if (hasPixelId) {
           const pixelId = String(body.pixelId || "").trim();
           if (pixelId && !/^\d{8,20}$/.test(pixelId)) {
@@ -1035,7 +1048,7 @@ export default async function handler(request: Request, response: Response) {
             body.activeProviderId || providers[0]?.id || ""
           );
           await sql!`INSERT INTO atlasio_settings (key, value) VALUES ('active_provider_id', ${activeProviderId}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
-        } else if (!hasPixelId) {
+        } else if (!hasPixelId && !hasShippingMode) {
           const provider = String(body.provider || "")
             .trim()
             .toLowerCase()
@@ -1069,6 +1082,7 @@ export default async function handler(request: Request, response: Response) {
           providers: publicProviders(currentSettings.providers),
           tokenConfigured: Boolean(currentSettings.token),
           deliveryFees: currentSettings.deliveryFees,
+          shippingMode: currentSettings.shippingMode,
           pixelId: await loadMetaPixelId(),
         });
         return;

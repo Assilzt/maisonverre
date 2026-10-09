@@ -111,10 +111,20 @@ describe('Atlasio security and workflow baseline', () => {
     const orders = await readFile(new URL('../api/orders.ts', import.meta.url), 'utf8');
     const dashboard = await readFile(new URL('./src/react-app/pages/Dashboard.tsx', import.meta.url), 'utf8');
     expect(orders).toContain('body.action === "note"');
+    expect(orders).toContain("shippingMode: ecoSettings.shippingMode");
     expect(orders).toContain('تمت إضافة التعليق');
     expect(dashboard).toContain('إضافة تعليق');
     expect(dashboard).toContain('ملاحظات الطلب');
     expect(dashboard).toContain('جاهزية الشحن');
     expect(dashboard).not.toContain('إجراءات إضافية');
+  });
+
+  it('persists the selected shipping mode instead of defaulting back to stock', async () => {
+    const orders = await readFile(new URL('../api/orders.ts', import.meta.url), 'utf8');
+    const dashboard = await readFile(new URL('./src/react-app/pages/Dashboard.tsx', import.meta.url), 'utf8');
+    expect(orders).toContain("'shipping_mode'");
+    expect(orders).toContain('body.shippingMode');
+    expect(dashboard).toContain('saveShippingMode(false)');
+    expect(dashboard).toContain('shippingMode: useStock ? "stock" : "without_stock"');
   });
 });
