@@ -15,6 +15,7 @@ describe('Atlasio security and workflow baseline', () => {
     expect(orders).toContain('payment_status');
     expect(orders).toContain('atlasio_order_events');
     expect(orders).toContain("body.action === 'contact'");
+    expect(orders).toContain('body.action === "note"');
   });
 
   it('keeps the homepage unchanged and scopes the Ecom12-inspired look to /ecom12', async () => {
@@ -104,5 +105,16 @@ describe('Atlasio security and workflow baseline', () => {
     expect(orders).toContain('58: 58, // El Meniaa');
     expect(home).toContain("'49 - تيميمون'");
     expect(home).toContain("'58 - المنيعة'");
+  });
+
+  it('provides a real CRM order note field without removing shipping readiness', async () => {
+    const orders = await readFile(new URL('../api/orders.ts', import.meta.url), 'utf8');
+    const dashboard = await readFile(new URL('./src/react-app/pages/Dashboard.tsx', import.meta.url), 'utf8');
+    expect(orders).toContain('body.action === "note"');
+    expect(orders).toContain('تمت إضافة التعليق');
+    expect(dashboard).toContain('إضافة تعليق');
+    expect(dashboard).toContain('ملاحظات الطلب');
+    expect(dashboard).toContain('جاهزية الشحن');
+    expect(dashboard).not.toContain('إجراءات إضافية');
   });
 });

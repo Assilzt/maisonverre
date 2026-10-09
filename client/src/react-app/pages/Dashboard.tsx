@@ -284,6 +284,8 @@ export default function Dashboard() {
   const [shipmentUpdates, setShipmentUpdates] = useState<ShipmentUpdate[]>([]);
   const [shipmentBusy, setShipmentBusy] = useState(false);
   const [contactBusy, setContactBusy] = useState(false);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentBusy, setCommentBusy] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -1058,6 +1060,7 @@ export default function Dashboard() {
     setActiveOrderId(order.id);
     setOrderEvents([]);
     setShipmentUpdates([]);
+    setCommentDraft("");
     void fetch(`/api/orders?resource=events&orderId=${order.id}`, {
       headers: authHeaders(),
     })
@@ -1075,6 +1078,7 @@ export default function Dashboard() {
     setEditing(null);
     setOrderEvents([]);
     setShipmentUpdates([]);
+    setCommentDraft("");
   };
   const startWork = () => {
     const next =
@@ -1133,6 +1137,32 @@ export default function Dashboard() {
       );
     } finally {
       setContactBusy(false);
+    }
+  };
+  const addOrderComment = async (order: Order) => {
+    const note = commentDraft.trim();
+    if (!note) return;
+    setCommentBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "note", id: order.id, note }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        events?: OrderEvent[];
+        error?: string;
+      };
+      if (!response.ok) throw new Error(data.error || "تعذر حفظ التعليق");
+      setOrderEvents(data.events || []);
+      setCommentDraft("");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "تعذر حفظ التعليق"
+      );
+    } finally {
+      setCommentBusy(false);
     }
   };
   const visibleIds = visibleOrders.map(order => order.id);
@@ -2647,68 +2677,45 @@ export default function Dashboard() {
                 </details>
               </div>
             )}
-            {![
-              "cancelled",
-              "trashed",
-              "shipped",
-              "delivered",
-              "returned",
-            ].includes(activeOrder.status) && (
-              <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-black text-amber-900">
-                    نتيجة الاتصال
+            <section className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black text-slate-800">ملاحظات الطلب</p>
+                  <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                    أضف ملاحظة داخلية لفريق المتابعة.
                   </p>
-                  <span className="text-[10px] font-bold text-amber-700">
-                    المحاولات: {activeOrder.contact_attempts || 0}
-                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    disabled={contactBusy}
-                    onClick={() => void recordContact(activeOrder, "confirmed")}
-                    className="rounded-xl bg-emerald-500 px-2 py-2.5 text-xs font-black text-white disabled:opacity-60"
-                  >
-                    تأكيد الطلب
-                  </button>
-                  <button
-                    type="button"
-                    disabled={contactBusy}
-                    onClick={() => void recordContact(activeOrder, "no_answer")}
-                    className="rounded-xl bg-white px-2 py-2.5 text-xs font-black text-amber-800 ring-1 ring-amber-200 disabled:opacity-60"
-                  >
-                    لا يجيب
-                  </button>
-                  <button
-                    type="button"
-                    disabled={contactBusy}
-                    onClick={() =>
-                      void recordContact(activeOrder, "call_later")
-                    }
-                    className="rounded-xl bg-white px-2 py-2.5 text-xs font-black text-slate-700 ring-1 ring-slate-200 disabled:opacity-60"
-                  >
-                    اتصل لاحقاً
-                  </button>
-                  <button
-                    type="button"
-                    disabled={contactBusy}
-                    onClick={() => void recordContact(activeOrder, "refused")}
-                    className="rounded-xl bg-white px-2 py-2.5 text-xs font-black text-rose-700 ring-1 ring-rose-200 disabled:opacity-60"
-                  >
-                    رفض الطلب
-                  </button>
-                </div>
+                <MessageCircle className="h-5 w-5 text-slate-400" />
               </div>
-            )}
-            <details className="mt-3 rounded-2xl border border-slate-200">
-              <summary className="cursor-pointer list-none px-3 py-3 text-xs font-black text-slate-600">
-                سجل الطلب ({orderEvents.length})
-              </summary>
-              <div className="space-y-2 border-t border-slate-100 p-3">
+              <textarea
+                value={commentDraft}
+                onChange={event => setCommentDraft(event.target.value)}
+                placeholder="اكتب تعليقاً على الطلب..."
+                maxLength={1000}
+                rows={3}
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              />
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-[10px] font-semibold text-slate-400">
+                  {commentDraft.length}/1000
+                </span>
+                <button
+                  type="button"
+                  disabled={commentBusy || !commentDraft.trim()}
+                  onClick={() => void addOrderComment(activeOrder)}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {commentBusy ? "جارٍ الحفظ..." : "إضافة تعليق"}
+                </button>
+              </div>
+              <details open className="mt-3 rounded-xl border border-slate-200 bg-white">
+                <summary className="cursor-pointer list-none px-3 py-2.5 text-xs font-black text-slate-600">
+                  سجل النشاط ({orderEvents.length})
+                </summary>
+                <div className="space-y-2 border-t border-slate-100 p-3">
                 {orderEvents.length === 0 ? (
                   <p className="text-xs font-bold text-slate-400">
-                    لا توجد أحداث مسجلة بعد.
+                    لا توجد ملاحظات أو تحديثات مسجلة بعد.
                   </p>
                 ) : (
                   orderEvents.map(event => (
@@ -2725,8 +2732,9 @@ export default function Dashboard() {
                     </div>
                   ))
                 )}
-              </div>
-            </details>
+                </div>
+              </details>
+            </section>
             <div className="mt-4 space-y-2">
               {activeOrder.status === "confirmed" &&
                 !activeOrder.ecotrack_tracking && (
@@ -2822,46 +2830,6 @@ export default function Dashboard() {
                     إلغاء الرفع من EcoTrack
                   </button>
                 )}
-              <details className="rounded-2xl border border-slate-200">
-                <summary className="cursor-pointer list-none px-3 py-3 text-xs font-black text-slate-600">
-                  إجراءات إضافية
-                </summary>
-                <div className="flex flex-wrap gap-2 border-t border-slate-100 p-3">
-                  {![
-                    "shipped",
-                    "delivered",
-                    "returned",
-                    "cancelled",
-                    "trashed",
-                  ].includes(activeOrder.status) && (
-                    <button
-                      type="button"
-                      onClick={() => startEditing(activeOrder)}
-                      className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700"
-                    >
-                      <Pencil className="mr-1 inline h-3.5 w-3.5" /> تعديل
-                      البيانات
-                    </button>
-                  )}
-                  {activeOrder.status === "trashed" ? (
-                    <button
-                      type="button"
-                      onClick={() => void runAction(activeOrder.id, "restore")}
-                      className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700"
-                    >
-                      استرجاع
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void runAction(activeOrder.id, "trash")}
-                      className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700"
-                    >
-                      نقل للسلة
-                    </button>
-                  )}
-                </div>
-              </details>
             </div>
           </div>
         </div>
