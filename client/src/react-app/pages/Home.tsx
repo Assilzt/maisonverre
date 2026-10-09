@@ -3,7 +3,7 @@ import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { Label } from '@/react-app/components/ui/label';
 import { trackMetaPixelEventOnce } from '@/react-app/lib/meta-pixel';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
 import {
   DEFAULT_PRODUCT,
   ProductLandingConfig,
@@ -17,6 +17,127 @@ import {
   getProductSessionLeadId,
   resetProductSessionLeadId,
 } from '@/react-app/product-config';
+
+type YouTubePlayerInstance = {
+  setPlaybackRate: (rate: number) => void;
+  destroy: () => void;
+};
+
+type YouTubeIframeApi = {
+  Player: new (
+    iframe: HTMLIFrameElement,
+    options: {
+      events: {
+        onReady: (event: { target: YouTubePlayerInstance }) => void;
+      };
+    },
+  ) => YouTubePlayerInstance;
+};
+
+declare global {
+  interface Window {
+    YT?: YouTubeIframeApi;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let youtubeIframeApiPromise: Promise<YouTubeIframeApi> | null = null;
+
+const loadYouTubeIframeApi = (): Promise<YouTubeIframeApi> => {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (youtubeIframeApiPromise) return youtubeIframeApiPromise;
+
+  youtubeIframeApiPromise = new Promise((resolve, reject) => {
+    const previousCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      try {
+        previousCallback?.();
+      } catch {
+        // An unrelated callback must not prevent this player from initializing.
+      }
+      if (window.YT?.Player) resolve(window.YT);
+      else reject(new Error('YouTube IFrame API did not initialize'));
+    };
+
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    script.async = true;
+    script.onerror = () => {
+      youtubeIframeApiPromise = null;
+      reject(new Error('Could not load YouTube IFrame API'));
+    };
+    document.head.appendChild(script);
+  });
+
+  return youtubeIframeApiPromise;
+};
+
+function YouTubeEmbedPlayer({ videoId }: { videoId: string }) {
+  const [activated, setActivated] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  useEffect(() => {
+    if (!activated || !iframeRef.current) return;
+    let isMounted = true;
+    let player: YouTubePlayerInstance | null = null;
+
+    void loadYouTubeIframeApi()
+      .then((youtube) => {
+        if (!isMounted || !iframeRef.current) return;
+        player = new youtube.Player(iframeRef.current, {
+          events: {
+            onReady: (event) => event.target.setPlaybackRate(1.3),
+          },
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+      player?.destroy();
+    };
+  }, [activated]);
+
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&enablejsapi=1&playsinline=1&rel=0&origin=${encodeURIComponent(window.location.origin)}`;
+
+  return (
+    <section className="ecom12-video-card" dir="rtl" aria-labelledby="ecom12-video-title">
+      <div className="ecom12-video-heading">
+        <h2 id="ecom12-video-title">شاهدوا الفراولة الأناناسية</h2>
+        <p>فيديو قصير عن الـ Pineberry النادرة</p>
+      </div>
+      <div className="ecom12-video-stage">
+        {activated ? (
+          <iframe
+            ref={iframeRef}
+            src={embedUrl}
+            title="فيديو قصير عن فراولة Pineberry الأناناسية"
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        ) : (
+          <button
+            type="button"
+            className="ecom12-video-poster"
+            onClick={() => setActivated(true)}
+            aria-label="تشغيل فيديو Pineberry"
+          >
+            <img
+              src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
+              alt="معاينة فيديو Pineberry"
+              loading="lazy"
+              decoding="async"
+            />
+            <span className="ecom12-video-play" aria-hidden="true"><Play fill="currentColor" /></span>
+          </button>
+        )}
+      </div>
+      <p className="ecom12-video-speed-note">تُطلب سرعة تشغيل 1.3× عند دعمها من YouTube.</p>
+    </section>
+  );
+}
 
 const WILAYAS = [
   '01 - أدرار', '02 - الشلف', '03 - الأغواط', '04 - أم البواقي', '05 - باتنة', '06 - بجاية', '07 - بسكرة', '08 - بشار', '09 - البليدة', '10 - البويرة',
@@ -860,6 +981,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
               </form>
             </div>
             )}
+            {design === 'ecom12' && <YouTubeEmbedPlayer videoId="u_yHscxu_pc" />}
           </div>
 
           <div className={`order-1 md:order-none flex justify-center items-start sticky top-8 ${design === 'ecom12' ? 'ecom12-image-column' : ''}`}>

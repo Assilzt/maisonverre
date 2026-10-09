@@ -38,6 +38,12 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain("getProductSessionLeadId(product)");
     expect(home).toContain("data?.messageId ?? data?.result?.message_id ?? messageId");
     expect(home).toContain("{ action: 'edit', messageId, text }");
+    expect(home).toContain('setPlaybackRate(1.3)');
+    expect(home).toContain('https://www.youtube-nocookie.com/embed/${videoId}');
+    expect(home).toContain('loading="lazy"');
+    expect(home).toContain('<YouTubeEmbedPlayer videoId="u_yHscxu_pc" />');
+    const styles = await readFile(new URL('./src/react-app/index.css', import.meta.url), 'utf8');
+    expect(styles).toContain('.ecom12-video-card {\n  order: 8 !important;');
     expect(home).toContain("/^(0[567]\\d{8}|\\+213[567]\\d{8})$/");
     expect(home.indexOf("fireFacebookEventOnce(product, 'Purchase'")).toBeLessThan(home.indexOf('const orderSaved = await saveOrder'));
     expect(home).toContain('`purchase:${leadId}`');
