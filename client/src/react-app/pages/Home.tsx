@@ -27,6 +27,7 @@ type YouTubePlayerInstance = {
   seekTo?: (seconds: number, allowSeekAhead?: boolean) => void;
   playVideo?: () => void;
   pauseVideo?: () => void;
+  unMute?: () => void;
 };
 
 type YouTubeIframeApi = {
@@ -36,6 +37,7 @@ type YouTubeIframeApi = {
       events: {
         onReady: (event: { target: YouTubePlayerInstance }) => void;
         onStateChange?: (event: { data: number }) => void;
+        onAutoplayBlocked?: () => void;
       };
     },
   ) => YouTubePlayerInstance;
@@ -149,7 +151,9 @@ function YouTubeEmbedPlayer({ videoId }: { videoId: string }) {
 
 function Ecom12VideoHero({ videoId }: { videoId: string }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const stopAtRef = useRef<number | null>(null);
   const autoStoppedRef = useRef(false);
 
@@ -183,8 +187,10 @@ function Ecom12VideoHero({ videoId }: { videoId: string }) {
                 player?.seekTo?.(0, true);
               }
             },
+            onAutoplayBlocked: () => setAutoplayBlocked(true),
           },
         });
+        playerRef.current = player;
       })
       .catch(() => undefined);
 
@@ -192,10 +198,11 @@ function Ecom12VideoHero({ videoId }: { videoId: string }) {
       isMounted = false;
       if (timer !== null) window.clearInterval(timer);
       player?.destroy();
+      playerRef.current = null;
     };
   }, []);
 
-  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
 
   return (
     <section className="ecom12-video-hero" dir="rtl" aria-labelledby="ecom12-video-hero-title">
@@ -210,6 +217,19 @@ function Ecom12VideoHero({ videoId }: { videoId: string }) {
           allowFullScreen
         />
         {!playerReady && <div className="ecom12-video-loading" aria-hidden="true" />}
+        {autoplayBlocked && (
+          <button
+            type="button"
+            className="ecom12-video-sound-fallback"
+            onClick={() => {
+              playerRef.current?.unMute?.();
+              playerRef.current?.playVideo?.();
+              setAutoplayBlocked(false);
+            }}
+          >
+            اضغط لتشغيل الفيديو بالصوت
+          </button>
+        )}
       </div>
       <div className="ecom12-video-hero-copy">
         <h1 id="ecom12-video-hero-title">شاهدها قبل أن تطلبها</h1>
