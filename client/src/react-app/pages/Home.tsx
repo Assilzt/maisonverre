@@ -22,6 +22,11 @@ import {
 type YouTubePlayerInstance = {
   setPlaybackRate: (rate: number) => void;
   destroy: () => void;
+  getDuration?: () => number;
+  getCurrentTime?: () => number;
+  seekTo?: (seconds: number, allowSeekAhead?: boolean) => void;
+  playVideo?: () => void;
+  pauseVideo?: () => void;
 };
 
 type YouTubeIframeApi = {
@@ -30,6 +35,7 @@ type YouTubeIframeApi = {
     options: {
       events: {
         onReady: (event: { target: YouTubePlayerInstance }) => void;
+        onStateChange?: (event: { data: number }) => void;
       };
     },
   ) => YouTubePlayerInstance;
@@ -136,6 +142,86 @@ function YouTubeEmbedPlayer({ videoId }: { videoId: string }) {
         )}
       </div>
       <p className="ecom12-video-speed-note">تُطلب سرعة تشغيل 1.3× عند دعمها من YouTube.</p>
+    </section>
+  );
+}
+
+
+function Ecom12VideoHero({ videoId }: { videoId: string }) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [playerReady, setPlayerReady] = useState(false);
+  const stopAtRef = useRef<number | null>(null);
+  const autoStoppedRef = useRef(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    let player: YouTubePlayerInstance | null = null;
+    let timer: number | null = null;
+
+    void loadYouTubeIframeApi()
+      .then((youtube) => {
+        if (!isMounted || !iframeRef.current) return;
+        player = new youtube.Player(iframeRef.current, {
+          events: {
+            onReady: (event) => {
+              event.target.setPlaybackRate(1);
+              const duration = event.target.getDuration?.() || 0;
+              stopAtRef.current = duration > 0 ? duration * 0.45 : null;
+              setPlayerReady(true);
+              timer = window.setInterval(() => {
+                const currentTime = player?.getCurrentTime?.() || 0;
+                const stopAt = stopAtRef.current;
+                if (!autoStoppedRef.current && stopAt && currentTime >= stopAt) {
+                  autoStoppedRef.current = true;
+                  player?.pauseVideo?.();
+                }
+              }, 250);
+            },
+            onStateChange: (event) => {
+              if (event.data === 1 && autoStoppedRef.current) {
+                autoStoppedRef.current = false;
+                player?.seekTo?.(0, true);
+              }
+            },
+          },
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+      if (timer !== null) window.clearInterval(timer);
+      player?.destroy();
+    };
+  }, []);
+
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
+
+  return (
+    <section className="ecom12-video-hero" dir="rtl" aria-labelledby="ecom12-video-hero-title">
+      <div className="ecom12-video-hero-frame">
+        <iframe
+          ref={iframeRef}
+          src={embedUrl}
+          title="فيديو قصير عن فراولة Pineberry"
+          loading="eager"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          allowFullScreen
+        />
+        {!playerReady && <div className="ecom12-video-loading" aria-hidden="true" />}
+      </div>
+      <div className="ecom12-video-hero-copy">
+        <h1 id="ecom12-video-hero-title">شاهدها قبل أن تطلبها</h1>
+        <p>فيديو قصير عن فراولة Pineberry البيضاء النادرة</p>
+      </div>
+      <a
+        className="ecom12-cta ecom12-video-hero-cta"
+        href="#lead-form"
+        onClick={() => window.setTimeout(() => document.getElementById('phone')?.focus(), 150)}
+      >
+        اطلب الآن
+      </a>
     </section>
   );
 }
@@ -362,7 +448,7 @@ function ImageSlider({ images, compact = false }: { images: ProductLandingConfig
 }
 
 
-export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: { product?: ProductLandingConfig; design?: 'default' | 'ecom12' }) {
+export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: { product?: ProductLandingConfig; design?: 'default' | 'ecom12' | 'ecom12-video' }) {
   const [fullName, setFullName] = useState('');
   const [wilaya, setWilaya] = useState('');
   const [commune, setCommune] = useState('');
@@ -374,8 +460,10 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [selectedBundleQuantity, setSelectedBundleQuantity] = useState(1);
+  const isEcom12Design = design === 'ecom12' || design === 'ecom12-video';
+  const isVideoEcom12 = design === 'ecom12-video';
   const searchParams = new URLSearchParams(window.location.search);
-  const isLimitedOffer = design !== 'ecom12' && product.limitedOffer?.enabled === true && searchParams.get('offer') === 'limited';
+  const isLimitedOffer = !isEcom12Design && product.limitedOffer?.enabled === true && searchParams.get('offer') === 'limited';
   const [limitedOfferEndsAt] = useState(() => getOfferEndsAt(product, 'limited', isLimitedOffer));
   const [giftOfferEndsAt] = useState(() => getOfferEndsAt(product, 'gift', product.gift?.enabled === true));
   const [giftBookletSelected, setGiftBookletSelected] = useState(false);
@@ -393,9 +481,9 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
   const giftOfferActive = Boolean(giftOfferEndsAt && currentTime < giftOfferEndsAt);
   const baseOfferPrice = isLimitedOffer && !limitedOfferActive ? product.compareAtPrice || product.price : getProductOfferPrice(product, searchParams, isLimitedOffer);
   const selectedBundle = product.bundles?.find((bundle) => bundle.quantity === selectedBundleQuantity) || product.bundles?.[0];
-  const offerPrice = design === 'ecom12' && selectedBundle ? selectedBundle.price : baseOfferPrice;
-  const compareAtTotal = product.compareAtPrice ? product.compareAtPrice * (design === 'ecom12' ? selectedBundle?.quantity || 1 : 1) : undefined;
-  const campaignLabel = design === 'ecom12' && selectedBundle
+  const offerPrice = isEcom12Design && selectedBundle ? selectedBundle.price : baseOfferPrice;
+  const compareAtTotal = product.compareAtPrice ? product.compareAtPrice * (isEcom12Design ? selectedBundle?.quantity || 1 : 1) : undefined;
+  const campaignLabel = isEcom12Design && selectedBundle
     ? `${product.tracking.campaignName} - ${selectedBundle.label}`
     : getProductCampaignLabel(product, offerPrice, isLimitedOffer);
   const productEventData = getProductEventData(product, offerPrice);
@@ -709,12 +797,12 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
   };
 
   return (
-    <div className={`min-h-screen relative overflow-hidden ${design === 'ecom12' ? 'ecom12-landing' : ''}`}>
+    <div className={`min-h-screen relative overflow-hidden ${isEcom12Design ? 'ecom12-landing' : ''} ${isVideoEcom12 ? 'ecom12-video-landing' : ''}`}>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(236,253,245,0.95),_transparent_52%),linear-gradient(135deg,_#fff7ed_0%,_#fdf2f8_48%,_#ecfdf5_100%)]">
         <div className="absolute inset-0 bg-white/70 backdrop-blur-sm"></div>
       </div>
 
-      {design === 'ecom12' && (
+      {isEcom12Design && (
         <div className="ecom12-announcement" role="note" dir="rtl">
           <div className="ecom12-marquee-content">
             <div className="ecom12-marquee-item"><span>Pineberry النادرة</span><span aria-hidden="true">●</span><span>الدفع عند الاستلام</span></div>
@@ -724,23 +812,24 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
         </div>
       )}
 
-      <div className={`relative z-10 container mx-auto px-4 py-8 max-w-6xl ${design === 'ecom12' ? 'ecom12-content' : ''}`}>
-        <div className={`grid md:grid-cols-2 gap-8 items-start ${design === 'ecom12' ? 'ecom12-layout' : ''}`}>
-          <div className={`order-2 md:order-none bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100 ${design === 'ecom12' ? 'ecom12-copy-card' : ''}`}>
+      <div className={`relative z-10 container mx-auto px-4 py-8 max-w-6xl ${isEcom12Design ? 'ecom12-content' : ''}`}>
+        <div className={`grid md:grid-cols-2 gap-8 items-start ${isEcom12Design ? 'ecom12-layout' : ''}`}>
+          {isVideoEcom12 && <Ecom12VideoHero videoId="u_yHscxu_pc" />}
+          <div className={`order-2 md:order-none bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 border border-pink-100 ${isEcom12Design ? 'ecom12-copy-card' : ''}`}>
             <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-gray-800" dir="rtl">
-              {design === 'ecom12' ? 'بذور الفراولة البيضاء الأناناسية | Pineberry' : product.headline} 🍓🤍🍍
+              {isEcom12Design ? 'بذور الفراولة البيضاء الأناناسية | Pineberry' : product.headline} 🍓🤍🍍
             </h1>
             <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm" dir="rtl">
-              <p className="text-base font-extrabold text-emerald-800">🍓🤍🍍 {design === 'ecom12' ? 'صنف نادر بنكهة فراولة ولمسة أناناس خفيفة' : product.subheadline}</p>
+              <p className="text-base font-extrabold text-emerald-800">🍓🤍🍍 {isEcom12Design ? 'صنف نادر بنكهة فراولة ولمسة أناناس خفيفة' : product.subheadline}</p>
             </div>
 
-            {design !== 'ecom12' && (
+            {!isEcom12Design && (
               <p className="mb-5 text-center text-sm leading-6 text-gray-600" dir="rtl">
                 {product.description}
               </p>
             )}
 
-            {design === 'ecom12' && (
+            {isEcom12Design && (
               <div className="ecom12-purchase-facts" dir="rtl" aria-label="معلومات المنتج والطلب">
                 <span>📦 حوالي 200–300 بذرة في العلبة</span>
                 <span>🚚 التوصيل المعتاد: يوم إلى يومين</span>
@@ -797,7 +886,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
               </div>
             ) : (
               <div className="rounded-3xl border border-pink-100 bg-white/95 p-4 shadow-[0_8px_30px_rgba(244,114,182,0.08)] ring-1 ring-white/60 md:p-6">
-                {design === 'ecom12' && <div className="ecom12-order-header" dir="rtl"><h2>استمارة الطلب</h2></div>}
+                {isEcom12Design && <div className="ecom12-order-header" dir="rtl"><h2>استمارة الطلب</h2></div>}
                 <form id="lead-form" onSubmit={handleSubmit} onFocus={trackInitiateCheckout} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="flex items-center gap-2 text-base font-bold text-gray-800">
@@ -876,7 +965,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                     </div>
                   </div>
 
-                {design === 'ecom12' && product.bundles && (
+                {isEcom12Design && product.bundles && (
                   <div className="ecom12-package-grid" dir="rtl" aria-label="اختر عدد العلب">
                     {product.bundles.map((bundle) => (
                       <button
@@ -886,22 +975,22 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                         onClick={() => setSelectedBundleQuantity(bundle.quantity)}
                         className={`ecom12-package-option ${selectedBundle?.quantity === bundle.quantity ? 'selected' : ''}`}
                       >
-                        <span className="ecom12-package-label">{design === 'ecom12' ? `${bundle.quantity} علبة` : bundle.label}</span>
+                        <span className="ecom12-package-label">{isEcom12Design ? `${bundle.quantity} علبة` : bundle.label}</span>
                         <span className="ecom12-package-price">{bundle.price} {product.currency}</span>
                       </button>
                     ))}
                   </div>
                 )}
 
-                {design === 'ecom12' && (
+                {isEcom12Design && (
                   <p className="ecom12-seed-note" dir="rtl">
                     كل علبة تحتوي على حوالي 200 إلى 300 بذرة. يختلف الإنبات حسب جودة البذور وطريقة الزراعة والظروف المناسبة؛ ولا يمكن ضمان إنبات كل بذرة.
                   </p>
                 )}
 
-                <div className={`text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200 ${design === 'ecom12' ? 'ecom12-price-summary' : ''}`} dir="rtl">
+                <div className={`text-center py-3 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200 ${isEcom12Design ? 'ecom12-price-summary' : ''}`} dir="rtl">
                   <p className="text-base font-semibold text-gray-800">
-                    {design === 'ecom12' ? 'سعر الباقة:' : 'سعر المنتج:'} <span className="text-xl font-extrabold text-emerald-700">{offerPrice} {product.currency}</span>
+                    {isEcom12Design ? 'سعر الباقة:' : 'سعر المنتج:'} <span className="text-xl font-extrabold text-emerald-700">{offerPrice} {product.currency}</span>
                   </p>
                   {compareAtTotal && offerPrice < compareAtTotal && (
                     <p className="mt-1 text-xs font-semibold text-gray-500">
@@ -938,7 +1027,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                   )}
                 </div>
 
-                {design !== 'ecom12' && giftOfferActive && (
+                {!isEcom12Design && giftOfferActive && (
                   <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2" dir="rtl">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-right">
@@ -951,7 +1040,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                   </div>
                 )}
 
-                {design !== 'ecom12' && (
+                {!isEcom12Design && (
                   <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4" dir="rtl">
                     {product.trustBadges.map((badge, index) => (
                       <div key={`${badge}-${index}`} className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-2 py-2">
@@ -976,7 +1065,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                   )}
                 </Button>
 
-                {design !== 'ecom12' && <div className="mt-4 overflow-hidden rounded-2xl border border-pink-200 bg-gradient-to-br from-white via-pink-50/70 to-emerald-50/80 p-4 shadow-sm" dir="rtl">
+                {!isEcom12Design && <div className="mt-4 overflow-hidden rounded-2xl border border-pink-200 bg-gradient-to-br from-white via-pink-50/70 to-emerald-50/80 p-4 shadow-sm" dir="rtl">
                   <div className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-center shadow-sm">
                     <p className="text-[15px] font-bold text-emerald-800">🍓🤍🍍 {product.resultTitle}</p>
                   </div>
@@ -1006,7 +1095,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
                   <p className="mt-3 text-center text-[11px] leading-5 text-gray-500">قد يختلف العدد قليلاً حسب حجم البذور والدفعة.</p>
                 </div>}
 
-                {design !== 'ecom12' && <p className="text-center text-sm text-gray-600 mt-4" dir="rtl">
+                {!isEcom12Design && <p className="text-center text-sm text-gray-600 mt-4" dir="rtl">
                   الدفع عند الاستلام. سنتصل بك قبل الشحن لتأكيد الطلب والتوصيل.
                 </p>}
               </form>
@@ -1015,10 +1104,10 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
             {design === 'ecom12' && <YouTubeEmbedPlayer videoId="u_yHscxu_pc" />}
           </div>
 
-          <div className={`order-1 md:order-none flex justify-center items-start sticky top-8 ${design === 'ecom12' ? 'ecom12-image-column' : ''}`}>
+          <div className={`order-1 md:order-none flex justify-center items-start sticky top-8 ${isEcom12Design ? 'ecom12-image-column' : ''}`}>
             <ImageSlider images={product.images} />
           </div>
-          {design === 'ecom12' && (
+          {isEcom12Design && (
             <div className="ecom12-features-grid" dir="rtl">
               <div className="ecom12-feature-item"><span aria-hidden="true">🌿</span><strong>طبيعية 100%</strong></div>
               <div className="ecom12-feature-item"><span aria-hidden="true">🌱</span><strong>زراعة منزلية</strong></div>
@@ -1027,7 +1116,7 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
           )}
         </div>
 
-        {design !== 'ecom12' && <section className="mt-8 rounded-2xl bg-white/90 p-5 shadow-lg md:p-6" dir="rtl">
+        {!isEcom12Design && <section className="mt-8 rounded-2xl bg-white/90 p-5 shadow-lg md:p-6" dir="rtl">
           <div className="flex flex-col gap-3 text-center sm:flex-row sm:items-center sm:justify-between sm:text-right">
             <div>
               <p className="text-sm font-semibold text-pink-600">{product.resultEyebrow}</p>

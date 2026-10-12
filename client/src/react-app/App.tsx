@@ -55,6 +55,7 @@ export default function App() {
           }
         />
         <Route path="/ecom12" element={<HomePage design="ecom12" />} />
+        <Route path="/ecom12-video" element={<HomePage design="ecom12-video" />} />
         <Route path="/p/:slug" element={<ProductLandingRoute />} />
       </Routes>
     </Router>

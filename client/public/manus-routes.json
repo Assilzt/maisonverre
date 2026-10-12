@@ -1,0 +1,8 @@
+{
+  "routes": [
+    { "path": "/", "title": "MaisonVerre" },
+    { "path": "/ecom12", "title": "MaisonVerre Ecom12" },
+    { "path": "/ecom12-video", "title": "MaisonVerre Ecom12 Video" },
+    { "path": "/p/:slug", "title": "Product landing page" }
+  ]
+}
