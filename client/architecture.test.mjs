@@ -68,10 +68,10 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).not.toContain('`view-content:${offerPrice}`');
     expect(home).toContain('price: offerPrice');
     expect(home).toContain('campaign: campaignLabel');
-    expect(product).toContain('{ quantity: 1, price: 1990, label: "علبة واحدة" }');
-    expect(product).toContain('price: 1990,');
-    expect(product).toContain('{ quantity: 2, price: 2700, label: "علبتان" }');
-    expect(product).toContain('{ quantity: 3, price: 3400, label: "3 علب" }');
+    expect(product).toContain('{ quantity: 1, price: 2290, label: "علبة واحدة" }');
+    expect(product).toContain('price: 2290,');
+    expect(product).toContain('{ quantity: 2, price: 2900, label: "علبتان" }');
+    expect(product).toContain('{ quantity: 3, price: 3490, label: "3 علب" }');
   });
 
   it('stores the Meta Pixel ID behind dashboard authentication and initializes it from saved settings', async () => {
