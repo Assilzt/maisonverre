@@ -18,6 +18,11 @@ const databaseUrl = process.env.DATABASE_URL;
 const dashboardPassword = process.env.DASHBOARD_PASSWORD;
 const sql = databaseUrl ? neon(databaseUrl) : null;
 let schemaReady: Promise<unknown> | null = null;
+const publicReadCache = new Map<
+  string,
+  { expiresAt: number; body: unknown }
+>();
+const PUBLIC_CACHE_TTL_MS = 5 * 60 * 1000;
 
 type Request = {
   method?: string;
@@ -431,10 +436,15 @@ export default async function handler(request: Request, response: Response) {
   }
 
   try {
-    await ensureSchema();
+    const resource = request.method === "GET" ? queryValue(request, "resource") : undefined;
+    if (
+      request.method !== "GET" ||
+      (resource !== "fees" && resource !== "communes")
+    ) {
+      await ensureSchema();
+    }
 
     if (request.method === "GET") {
-      const resource = queryValue(request, "resource");
       if (resource === "pixel-config") {
         response.status(200).json({ pixelId: await loadMetaPixelId() });
         return;
@@ -514,6 +524,16 @@ export default async function handler(request: Request, response: Response) {
         return;
       }
       if (resource === "fees") {
+        const cacheKey = `fees:${ecoSettings.provider}:${ecoSettings.providerId}`;
+        const cached = publicReadCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+          response.setHeader(
+            "Cache-Control",
+            "public, s-maxage=300, stale-while-revalidate=600"
+          );
+          response.status(200).json(cached.body);
+          return;
+        }
         const toNumber = (value: unknown) => {
           const number = Number(value);
           return Number.isFinite(number) ? number : 0;
@@ -577,7 +597,16 @@ export default async function handler(request: Request, response: Response) {
             tarif_stopdesk: toNumber(value.stopDesk || value.home),
           });
         }
-        response.status(200).json({ fees: Array.from(merged.values()) });
+        const body = { fees: Array.from(merged.values()) };
+        publicReadCache.set(cacheKey, {
+          expiresAt: Date.now() + PUBLIC_CACHE_TTL_MS,
+          body,
+        });
+        response.setHeader(
+          "Cache-Control",
+          "public, s-maxage=300, stale-while-revalidate=600"
+        );
+        response.status(200).json(body);
         return;
       }
       if (resource === "communes") {
@@ -586,9 +615,28 @@ export default async function handler(request: Request, response: Response) {
           response.status(400).json({ error: "الولاية مطلوبة" });
           return;
         }
-        response
-          .status(200)
-          .json({ communes: await fetchEcoTrackCommunes(wilaya, ecoSettings) });
+        const cacheKey = `communes:${ecoSettings.provider}:${wilaya}`;
+        const cached = publicReadCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+          response.setHeader(
+            "Cache-Control",
+            "public, s-maxage=300, stale-while-revalidate=600"
+          );
+          response.status(200).json(cached.body);
+          return;
+        }
+        const body = {
+          communes: await fetchEcoTrackCommunes(wilaya, ecoSettings),
+        };
+        publicReadCache.set(cacheKey, {
+          expiresAt: Date.now() + PUBLIC_CACHE_TTL_MS,
+          body,
+        });
+        response.setHeader(
+          "Cache-Control",
+          "public, s-maxage=300, stale-while-revalidate=600"
+        );
+        response.status(200).json(body);
         return;
       }
       if (resource === "events") {

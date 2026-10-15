@@ -31,8 +31,9 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain("fireFacebookEventOnce(product, 'Purchase'");
     expect(home).toContain("fireFacebookEventOnce(product, 'Lead'");
     expect(home).toContain("fireFacebookEventOnce(product, 'ViewContent', 'view-content', productEventData)");
-    expect(home).toContain("href=\"#lead-form\"");
-    expect(home).toContain("'AddToCart',\n                    'ecom12-add-to-cart'");
+    expect(home).toContain('id="lead-form"');
+    expect(home).not.toContain('href="#lead-form"');
+    expect(home).not.toContain("'ecom12-add-to-cart'");
     expect(home).toContain('🍓🤍🍍');
     expect(home).toContain('digitCount < 3 && !activeDraftLeadIdRef.current');
     expect(home).toContain('draftSync: true');
@@ -43,9 +44,8 @@ describe('Atlasio security and workflow baseline', () => {
     expect(home).toContain('https://www.youtube-nocookie.com/embed/${videoId}');
     expect(home).toContain('loading="lazy"');
     expect(home).toContain('<YouTubeEmbedPlayer videoId="u_yHscxu_pc" />');
-    expect(home).toContain('حوالي 200–300 بذرة في العلبة');
-    expect(home).toContain('التوصيل المعتاد: يوم إلى يومين');
-    expect(home).toContain('ضمان استبدال عند وجود مشكلة بالمنتج');
+    expect(home).not.toContain('التوصيل المعتاد: يوم إلى يومين');
+    expect(home).not.toContain('ضمان استبدال عند وجود مشكلة بالمنتج');
     expect(home).toContain('ولا يمكن ضمان إنبات كل بذرة');
     expect(home).not.toContain('ازرع Pineberry المميزة: فراولة بيضاء قليلة الانتشار');
     expect(home).not.toContain('إلى المكتب');

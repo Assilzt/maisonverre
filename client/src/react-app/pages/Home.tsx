@@ -150,6 +150,7 @@ function YouTubeEmbedPlayer({ videoId }: { videoId: string }) {
 
 
 function Ecom12VideoHero({ videoId }: { videoId: string }) {
+  const [activated, setActivated] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
@@ -158,6 +159,7 @@ function Ecom12VideoHero({ videoId }: { videoId: string }) {
   const autoStoppedRef = useRef(false);
 
   useEffect(() => {
+    if (!activated) return;
     let isMounted = true;
     let player: YouTubePlayerInstance | null = null;
     let timer: number | null = null;
@@ -200,23 +202,42 @@ function Ecom12VideoHero({ videoId }: { videoId: string }) {
       player?.destroy();
       playerRef.current = null;
     };
-  }, []);
+  }, [activated]);
 
   const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
 
   return (
     <section className="ecom12-video-hero" dir="rtl" aria-labelledby="ecom12-video-hero-title">
       <div className="ecom12-video-hero-frame">
-        <iframe
-          ref={iframeRef}
-          src={embedUrl}
-          title="فيديو قصير عن فراولة Pineberry"
-          loading="eager"
-          referrerPolicy="strict-origin-when-cross-origin"
-          allow="autoplay; encrypted-media; picture-in-picture"
-          allowFullScreen
-        />
-        {!playerReady && <div className="ecom12-video-loading" aria-hidden="true" />}
+        {activated ? (
+          <>
+            <iframe
+              ref={iframeRef}
+              src={embedUrl}
+              title="فيديو قصير عن فراولة Pineberry"
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+            />
+            {!playerReady && <div className="ecom12-video-loading" aria-hidden="true" />}
+          </>
+        ) : (
+          <button
+            type="button"
+            className="ecom12-video-poster"
+            onClick={() => setActivated(true)}
+            aria-label="تشغيل فيديو Pineberry"
+          >
+            <img
+              src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
+              alt="معاينة فيديو Pineberry"
+              loading="lazy"
+              decoding="async"
+            />
+            <span className="ecom12-video-play" aria-hidden="true"><Play fill="currentColor" /></span>
+          </button>
+        )}
         {autoplayBlocked && (
           <button
             type="button"
@@ -235,13 +256,6 @@ function Ecom12VideoHero({ videoId }: { videoId: string }) {
         <h1 id="ecom12-video-hero-title">شاهدها قبل أن تطلبها</h1>
         <p>فيديو قصير عن فراولة Pineberry البيضاء النادرة</p>
       </div>
-      <a
-        className="ecom12-cta ecom12-video-hero-cta"
-        href="#lead-form"
-        onClick={() => window.setTimeout(() => document.getElementById('phone')?.focus(), 150)}
-      >
-        اطلب الآن
-      </a>
     </section>
   );
 }
@@ -849,32 +863,6 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
               </p>
             )}
 
-            {isEcom12Design && (
-              <div className="ecom12-purchase-facts" dir="rtl" aria-label="معلومات المنتج والطلب">
-                <span>📦 حوالي 200–300 بذرة في العلبة</span>
-                <span>🚚 التوصيل المعتاد: يوم إلى يومين</span>
-                <span>↩️ ضمان استبدال عند وجود مشكلة بالمنتج</span>
-              </div>
-            )}
-
-            {design === 'ecom12' && (
-              <a
-                className="ecom12-cta"
-                href="#lead-form"
-                dir="rtl"
-                onClick={() =>
-                  fireFacebookEventOnce(
-                    product,
-                    'AddToCart',
-                    'ecom12-add-to-cart',
-                    productEventData,
-                  )
-                }
-              >
-                اطلب الآن
-              </a>
-            )}
-
             {isLimitedOffer && (
               <div className={`mb-5 rounded-xl border p-3 text-center ${limitedOfferActive ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`} dir="rtl">
                 {limitedOfferActive ? (
@@ -1124,9 +1112,11 @@ export default function Home({ product = DEFAULT_PRODUCT, design = 'default' }: 
             {design === 'ecom12' && <YouTubeEmbedPlayer videoId="u_yHscxu_pc" />}
           </div>
 
-          <div className={`order-1 md:order-none flex justify-center items-start sticky top-8 ${isEcom12Design ? 'ecom12-image-column' : ''}`}>
-            <ImageSlider images={product.images} />
-          </div>
+          {!isVideoEcom12 && (
+            <div className={`order-1 md:order-none flex justify-center items-start sticky top-8 ${isEcom12Design ? 'ecom12-image-column' : ''}`}>
+              <ImageSlider images={product.images} />
+            </div>
+          )}
           {isEcom12Design && (
             <div className="ecom12-features-grid" dir="rtl">
               <div className="ecom12-feature-item"><span aria-hidden="true">🌿</span><strong>طبيعية 100%</strong></div>
